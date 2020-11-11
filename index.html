@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<div id="root">
+    <p>111</p>
+</div>
+
+<body>
+    <script src="./babel.min.js"></script>
+    <script src='./react.js'></script>
+    <script src='./react-dom.js'></script>
+
+    <!-- <script src='./App.js'></script> -->
+    <!-- <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script> -->
+
+    <script type="text/babel">
+        class App extends React.Component {
+            constructor(props) {
+                super(props)
+                this.state = { hello: "888888" }
+            }
+
+            getSnapshotBeforeUpdate(a) {
+                console.log('--getSnapshotBeforeUpdate--', a)
+            }
+
+            render() {
+                return <div style={{ color: "red", fontSize: "20px" }}>
+                    1
+                    <p>{this.state.hello}</p>
+                    <p style={{ color: "orange" }}>hello world</p>
+                    <p>go</p>
+                </div>
+            }
+        }
+
+        
+        console.log(React.createElement("span", {}, "hello react"))
+        ReactDOM.render(
+            <App />,
+            document.getElementById('root')
+        );
+
+    </script>
+
+</body>
+
+</html>
