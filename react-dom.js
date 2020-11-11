@@ -90,23 +90,419 @@ var COMMENT_NODE = 8;
 var DOCUMENT_NODE = 9;
 var DOCUMENT_FRAGMENT_NODE = 11;
 
+//↓↓↓↓↓↓--------***---------↓↓↓↓↓↓
+//↑↑↑↑↑↑--------***---------↑↑↑↑↑↑
+
 
 
 var REACT_ELEMENT_TYPE = Symbol.for('react.element')
+//↓↓↓↓↓↓--------工具函数---------↓↓↓↓↓↓
+{
+    var isArray$1 = Array.isArray;
 
-var isArray$1 = Array.isArray;
+    function get(key) {
+        return key._reactInternalFiber;
+    }
 
-function get(key) {
-    return key._reactInternalFiber;
+    function has(key) {
+        return key._reactInternalFiber !== undefined;
+    }
+
+    function set(key, value) {
+        key._reactInternalFiber = value;
+    }
+
 }
+//↑↑↑↑↑↑--------工具函数---------↑↑↑↑↑↑
 
-function has(key) {
-    return key._reactInternalFiber !== undefined;
-}
 
-function set(key, value) {
-    key._reactInternalFiber = value;
+
+
+//↓↓↓↓↓↓--------关于fiber节点的函数---------↓↓↓↓↓↓
+{
+    //创建一个普通的fiber节点
+    function createFiber(tag, pendingProps, key, mode) {
+        return new FiberNode(tag, pendingProps, key, mode)
+    }
+
+    //生成普通fiber节点的函数
+    function FiberNode(tag, pendingProps, key, mode) {
+        // Instance
+        //标记不同的组件类型
+        //有原生的DOM节点，有React自己的节点
+        this.tag = tag;
+        //ReactElement里面的key
+        this.key = key;
+        //ReactElement.type，也就是我们调用createElement的第一个参数
+        this.elementType = null;
+        //异步组件resolve之后返回的内容，一般是function或class
+        //比如懒加载
+        this.type = null;
+
+        //当前Fiber的状态（比如浏览器环境就是DOM节点）  
+        //不同类型的实例都会记录在stateNode上  
+        //比如DOM组件对应DOM节点实例  
+        //ClassComponent对应Class实例  
+        //FunctionComponent没有实例，所以stateNode值为null  
+        //state更新了或props更新了均会更新到stateNode上
+        this.stateNode = null; // Fiber
+
+        //指向该对象在Fiber节点树中的`parent`，用来在处理完该节点后返回
+        //即流程图上的红线
+        this.return = null;
+        //指向自己的第一个子节点
+        this.child = null;
+        //指向自己的兄弟结构
+        //兄弟节点的return指向同一个父节点
+        this.sibling = null;
+        this.index = 0;
+        //ref属性
+        this.ref = null;
+        //新的变动带来的新的props，即nextProps
+        this.pendingProps = pendingProps;
+        //上一次渲染完成后的props,即 props
+        this.memoizedProps = null;
+        //该Fiber对应的组件，所产生的update，都会放在该队列中
+        this.updateQueue = null;
+
+        //上次渲染的state，即 state
+        //新的state由updateQueue计算得出，并覆盖memoizedState
+        this.memoizedState = null;
+
+        //一个列表，存在该Fiber依赖的contexts，events
+        this.dependencies = null;
+
+        //mode有conCurrentMode和strictMode
+
+        //用来描述当前Fiber和其他子树的Bitfield
+        //共存的模式表示这个子树是否默认是 异步渲染的
+
+        //Fiber刚被创建时，会继承父Fiber
+        //this.mode = mode; 
+
+        // Effects
+        //以下属性是副作用
+        //副作用是 标记组件哪些需要更新的工具、标记组件需要执行哪些生命周期的工具
+        this.effectTag = NoEffect;
+        //16进制的数字，可以理解为通过一个字段标识n个动作，如Placement、Update、Deletion、Callback……所以源码中看到很多 &=
+
+        this.nextEffect = null;
+        //表示下一个将要处理的副作用FiberNode的引用
+
+        this.firstEffect = null;
+        //与副作用操作遍历流程相关 当前节点下，第一个需要处理的副作用FiberNode的引用
+
+        this.lastEffect = null;
+        //表示最后一个将要处理的副作用FiberNode的引用
+
+        //代表任务在未来的哪个时间点 应该被完成
+        //不包括该Fiber的子树产生的任务
+        this.expirationTime = NoWork; //ExpirationTime
+
+        //快速确定子树中是否有 update
+        //如果子节点有update的话，就记录应该更新的时间
+        this.childExpirationTime = NoWork; //ExpirationTime
+
+        // 在FIber树更新的过程中，每个Fiber都有与其对应的Fiber 
+        //我们称之为 current <==> workInProgress 
+        //在渲染完成后，会交换位置  
+        //doubleBuffer Fiber在更新后，不用再重新创建对象，  
+        // 而是复制自身，并且两者相互复用，用来提高性能
+        this.alternate = null;
+
+    }
+
+    //创建fiber数据结构根节点的函数。生成一个对象
+    function FiberRootNode(containerInfo, tag = 0) {
+        this.tag = tag;
+        this.current = null;
+        this.containerInfo = containerInfo;
+        this.pendingChildren = null;
+        this.pingCache = null;
+        //this.finishedExpirationTime = NoWork;
+        this.finishedWork = null;
+        // this.timeoutHandle = noTimeout;
+        this.context = null;
+        this.pendingContext = null;
+        this.hydrate = false;
+        this.callbackNode = null;
+        // this.callbackPriority = NoPriority;
+        // this.firstPendingTime = NoWork;
+        // this.firstSuspendedTime = NoWork;
+        // this.lastSuspendedTime = NoWork;
+        // this.nextKnownPendingLevel = NoWork;
+        // this.lastPingedTime = NoWork;
+        // this.lastExpiredTime = NoWork;
+    }
+
+
+    function createFiberFromElement(element, mode, expirationTime) {
+        var owner = null;
+
+        var type = element.type;
+        var key = element.key;
+        var pendingProps = element.props;
+        var fiber = createFiberFromTypeAndProps(type, key, pendingProps, owner, mode, expirationTime);
+
+        return fiber;
+    }
+
+    function createFiberFromFragment(elements, mode, expirationTime, key) {
+        var fiber = createFiber(Fragment, elements, key, mode);
+        fiber.expirationTime = expirationTime;
+        return fiber;
+    }
+
+    function createFiberFromTypeAndProps(type, // React$ElementType
+        key, pendingProps, owner, mode, expirationTime) {
+        var fiber;
+        var fiberTag; // The resolved type is set if we know what the final type will be. I.e. it's not lazy.
+
+        var resolvedType = type;
+
+        if (typeof type === 'function') {
+            fiberTag = ClassComponent;
+        } else if (typeof type === 'string') {
+            fiberTag = HostComponent;
+        } else {
+            getTag: switch (type) {
+                default: {
+
+                }
+            }
+        }
+
+        fiber = createFiber(fiberTag, pendingProps, key, mode);
+        fiber.elementType = type;
+        fiber.type = resolvedType;
+        fiber.expirationTime = expirationTime;
+        return fiber;
+    }
+
+    function createFiberFromText(content, mode, expirationTime) {
+        var fiber = createFiber(HostText, content, null, mode);
+        fiber.expirationTime = expirationTime;
+        return fiber;
+    }
+
 }
+//↑↑↑↑↑↑--------关于fiber节点的创建---------↑↑↑↑↑↑
+
+
+//↓↓↓↓↓↓--------关于时间的函数---------↓↓↓↓↓↓
+{
+    function requestCurrentTimeForUpdate() {
+        return 1073741821 - (100 / 10 | 0)
+    }
+
+    function computeExpirationForFiber() {
+        return Sync
+    }
+
+
+}
+//↑↑↑↑↑↑--------关于时间的函数---------↑↑↑↑↑↑
+
+
+//↓↓↓↓↓↓--------关于update对象的函数---------↓↓↓↓↓↓
+{
+    /**
+     * 创建更新包对象。一个由next属性链接的环状结构
+     * 
+     * tag属性，存储更新包的类型。0更新 1替换 2强制更新 3捕获性的更新
+     * payload存储更新材料
+     * next指向下一个更新。默认obj的下一个更新还是obj
+     */
+
+    function createUpdate(expirationTime, suspenseConfig = null) {
+        var update = {
+            // 过期时间
+            expirationTime: expirationTime,
+            suspenseConfig: suspenseConfig,
+
+            // export const UpdateState = 0;
+            // export const ReplaceState = 1;
+            // export const ForceUpdate = 2;
+            // export const CaptureUpdate = 3;
+            // 指定更新的类型，值为以上几种
+            // 提下CaptureUpdate，在React16后有一个ErrorBoundaries功能
+            // 即在渲染过程中报错了，可以选择新的渲染状态（提示有错误的状态），来更新页面
+            // 0更新 1替换 2强制更新 3捕获性的更新
+            //tag: UpdateState,
+            tag: 0,
+
+            // 更新内容，比如`setState`接收的第一个参数
+            // 第一次渲染ReactDOM.render接收的是payload = {element};
+            payload: null,
+
+            // 更新完成后对应的回调，`setState`，`render`都有
+            callback: null,
+
+            // 指向下一个更新
+            next: null
+        };
+        update.next = update;
+
+        return update;
+    }
+
+
+    /**
+     * 
+     * 将update挂载在fiber.updateQueue.pending的第一位置
+     * pending的update是个环状结构
+     * 
+     * 原来如果有pengding现在就顺延为下一个
+     * 
+     */
+    function enqueueUpdate(fiber, update) {
+
+        //更新后面
+        var updateQueue = fiber.updateQueue;
+        var sharedQueue = updateQueue.shared;
+        var pending = sharedQueue.pending;
+        if (pending === null) {
+            // This is the first update. Create a circular list.
+            update.next = update;
+        } else {
+            //这里什么意思？？？？？放弃pengding的更新？？？
+            update.next = pending.next;
+            pending.next = update;
+        }
+
+        sharedQueue.pending = update;
+    }
+
+
+    //fiber节点初始化updateQueue属性。
+    //即fiber.updateQueue已经有一个初始化后的queue对象结构
+    //queue对象会保留fiber本身的memoizedState值，存在baseState中
+    function initializeUpdateQueue(fiber) {
+        //fiber
+        var queue = {
+            // 应用更新后的state
+            // 每次的更新都是在这个baseState基础上进行更新
+            baseState: fiber.memoizedState,
+            baseQueue: null,
+            shared: {
+                pending: null
+            },
+            effects: null
+        };
+        fiber.updateQueue = queue;
+    }
+
+
+    function cloneUpdateQueue(current, workInProgress) {
+
+        //不懂这个函数的作用
+        // Clone the update queue from current. Unless it's already a clone.
+        var queue = workInProgress.updateQueue;
+        var currentQueue = current.updateQueue;
+        if (queue === currentQueue) {
+            var clone = {
+                baseState: currentQueue.baseState,
+                baseQueue: currentQueue.baseQueue,
+                shared: currentQueue.shared,
+                effects: currentQueue.effects
+            };
+            workInProgress.updateQueue = clone;
+        }
+    }
+
+
+    function processUpdateQueue(workInProgress, props, instance, renderExpirationTime) {
+        //这个方法要做的事情，就是遍历这个 UpdateQueue ，
+        //然后计算出最后的新 State，然后存到workInProgress.memoizedState和 instance 中
+        var queue = workInProgress.updateQueue;
+        var baseQueue = queue.baseQueue; // The last pending update that hasn't been processed yet.
+
+        var pendingQueue = queue.shared.pending;
+
+        if (pendingQueue !== null) {
+
+            //将workInProgress.updateQueue中的pendingQueue赋值给 workInProgress.alternate.updateQueue.baseQueue
+
+            // We have new updates that haven't been processed yet.
+            // We'll add them to the base queue.
+            if (baseQueue !== null) {
+                // Merge the pending queue and the base queue.
+                var baseFirst = baseQueue.next;
+                var pendingFirst = pendingQueue.next;
+                baseQueue.next = pendingFirst;
+                pendingQueue.next = baseFirst;
+            }
+
+            baseQueue = pendingQueue;
+            queue.shared.pending = null;
+
+            var current = workInProgress.alternate;
+
+            if (current !== null) {
+                var currentQueue = current.updateQueue;
+
+                if (currentQueue !== null) {
+                    currentQueue.baseQueue = pendingQueue;
+                }
+            }
+        }
+
+
+        if (baseQueue !== null) {
+            var first = baseQueue.next; // Iterate through the list of updates to compute the result.
+
+            var newState = queue.baseState;
+            var newExpirationTime = NoWork;
+            var newBaseState = null;
+            var newBaseQueueFirst = null;
+            var newBaseQueueLast = null;
+
+            if (first !== null) {
+                var update = first;
+
+                do {
+
+                    newState = getStateFromUpdate(workInProgress, queue, update, newState, props, instance);
+
+                    update = update.next;
+
+                    if (update === null || update === first) {
+                        pendingQueue = queue.shared.pending;
+                        if (pendingQueue === null) {
+                            break;
+                        } else {
+                            // An update was scheduled from inside a reducer. Add the new
+                            // pending updates to the end of the list and keep processing.
+                            update = baseQueue.next = pendingQueue.next;
+                            pendingQueue.next = first;
+                            queue.baseQueue = baseQueue = pendingQueue;
+                            queue.shared.pending = null;
+                        }
+                    }
+                } while (true);
+            }
+
+            if (newBaseQueueLast === null) {
+                newBaseState = newState;
+            } else {
+                newBaseQueueLast.next = newBaseQueueFirst;
+            }
+
+            queue.baseState = newBaseState;
+            queue.baseQueue = newBaseQueueLast;
+
+            workInProgress.expirationTime = newExpirationTime;
+            workInProgress.memoizedState = newState;
+        }
+
+
+    }
+
+}
+//↑↑↑↑↑↑--------关于update对象的函数---------↑↑↑↑↑↑
+
+
+
 
 function markUpdate(workInProgress) {
     // Tag the fiber with an update effect. This turns a Placement into
@@ -118,274 +514,20 @@ function shouldSetTextContent(type, props) {
     return type === 'textarea' || type === 'option' || type === 'noscript' || typeof props.children === 'string' || typeof props.children === 'number' || typeof props.dangerouslySetInnerHTML === 'object' && props.dangerouslySetInnerHTML !== null && props.dangerouslySetInnerHTML.__html != null;
 }
 
-function createFiber(tag, pendingProps, key, mode) {
-    return new FiberNode(tag, pendingProps, key, mode)
-}
 
 
 
-function FiberNode(tag, pendingProps, key, mode) {
-    // Instance
-    //标记不同的组件类型
-    //有原生的DOM节点，有React自己的节点
-    this.tag = tag;
-    //ReactElement里面的key
-    this.key = key;
-    //ReactElement.type，也就是我们调用createElement的第一个参数
-    this.elementType = null;
-    //异步组件resolve之后返回的内容，一般是function或class
-    //比如懒加载
-    this.type = null;
 
-    //当前Fiber的状态（比如浏览器环境就是DOM节点）  
-    //不同类型的实例都会记录在stateNode上  
-    //比如DOM组件对应DOM节点实例  
-    //ClassComponent对应Class实例  
-    //FunctionComponent没有实例，所以stateNode值为null  
-    //state更新了或props更新了均会更新到stateNode上
-    this.stateNode = null; // Fiber
 
-    //指向该对象在Fiber节点树中的`parent`，用来在处理完该节点后返回
-    //即流程图上的红线
-    this.return = null;
-    //指向自己的第一个子节点
-    this.child = null;
-    //指向自己的兄弟结构
-    //兄弟节点的return指向同一个父节点
-    this.sibling = null;
-    this.index = 0;
-    //ref属性
-    this.ref = null;
-    //新的变动带来的新的props，即nextProps
-    this.pendingProps = pendingProps;
-    //上一次渲染完成后的props,即 props
-    this.memoizedProps = null;
-    //该Fiber对应的组件，所产生的update，都会放在该队列中
-    this.updateQueue = null;
 
-    //上次渲染的state，即 state
-    //新的state由updateQueue计算得出，并覆盖memoizedState
-    this.memoizedState = null;
 
-    //一个列表，存在该Fiber依赖的contexts，events
-    this.dependencies = null;
 
-    //mode有conCurrentMode和strictMode
 
-    //用来描述当前Fiber和其他子树的Bitfield
-    //共存的模式表示这个子树是否默认是 异步渲染的
 
-    //Fiber刚被创建时，会继承父Fiber
-    //this.mode = mode; 
 
-    // Effects
-    //以下属性是副作用
-    //副作用是 标记组件哪些需要更新的工具、标记组件需要执行哪些生命周期的工具
-    this.effectTag = NoEffect;
-    //16进制的数字，可以理解为通过一个字段标识n个动作，如Placement、Update、Deletion、Callback……所以源码中看到很多 &=
 
-    this.nextEffect = null;
-    //表示下一个将要处理的副作用FiberNode的引用
 
-    this.firstEffect = null;
-    //与副作用操作遍历流程相关 当前节点下，第一个需要处理的副作用FiberNode的引用
 
-    this.lastEffect = null;
-    //表示最后一个将要处理的副作用FiberNode的引用
-
-    //代表任务在未来的哪个时间点 应该被完成
-    //不包括该Fiber的子树产生的任务
-    this.expirationTime = NoWork; //ExpirationTime
-
-    //快速确定子树中是否有 update
-    //如果子节点有update的话，就记录应该更新的时间
-    this.childExpirationTime = NoWork; //ExpirationTime
-
-    // 在FIber树更新的过程中，每个Fiber都有与其对应的Fiber 
-    //我们称之为 current <==> workInProgress 
-    //在渲染完成后，会交换位置  
-    //doubleBuffer Fiber在更新后，不用再重新创建对象，  
-    // 而是复制自身，并且两者相互复用，用来提高性能
-    this.alternate = null;
-
-}
-
-function FiberRootNode(containerInfo, tag = 0) {
-    this.tag = tag;
-    this.current = null;
-    this.containerInfo = containerInfo;
-    this.pendingChildren = null;
-    this.pingCache = null;
-    //this.finishedExpirationTime = NoWork;
-    this.finishedWork = null;
-    // this.timeoutHandle = noTimeout;
-    this.context = null;
-    this.pendingContext = null;
-    this.hydrate = false;
-    this.callbackNode = null;
-    // this.callbackPriority = NoPriority;
-    // this.firstPendingTime = NoWork;
-    // this.firstSuspendedTime = NoWork;
-    // this.lastSuspendedTime = NoWork;
-    // this.nextKnownPendingLevel = NoWork;
-    // this.lastPingedTime = NoWork;
-    // this.lastExpiredTime = NoWork;
-}
-
-//创建更新队列
-function initializeUpdateQueue(fiber) {
-    var queue = {
-        // 应用更新后的state
-        // 每次的更新都是在这个baseState基础上进行更新
-        baseState: fiber.memoizedState,
-        baseQueue: null,
-        shared: {
-            pending: null
-        },
-        effects: null
-    };
-    fiber.updateQueue = queue;
-}
-
-function legacyCreateRootFromDOMContainer(container) {
-    var rootSibling;
-    while (rootSibling = container.lastChild) {
-        container.removeChild(rootSibling);
-    }
-
-    var root = new FiberRootNode(container)
-    var uninitializedFiber = createFiber(HostRoot = 3, null, null);
-    uninitializedFiber.stateNode = root;
-    //root.current = uninitializedFiber;
-    root.current = uninitializedFiber;
-    initializeUpdateQueue(uninitializedFiber);
-    return {
-        _internalRoot: root
-    }
-
-}
-
-function createUpdate(expirationTime, suspenseConfig = null) {
-    var update = {
-        // 过期时间
-        expirationTime: expirationTime,
-        suspenseConfig: suspenseConfig,
-
-        // export const UpdateState = 0;
-        // export const ReplaceState = 1;
-        // export const ForceUpdate = 2;
-        // export const CaptureUpdate = 3;
-        // 指定更新的类型，值为以上几种
-        // 提下CaptureUpdate，在React16后有一个ErrorBoundaries功能
-        // 即在渲染过程中报错了，可以选择新的渲染状态（提示有错误的状态），来更新页面
-        // 0更新 1替换 2强制更新 3捕获性的更新
-        //tag: UpdateState,
-        tag: 0,
-
-        // 更新内容，比如`setState`接收的第一个参数
-        // 第一次渲染ReactDOM.render接收的是payload = {element};
-        payload: null,
-
-        // 更新完成后对应的回调，`setState`，`render`都有
-        callback: null,
-
-        // 指向下一个更新
-        next: null
-    };
-    update.next = update;
-
-    return update;
-}
-
-function requestCurrentTimeForUpdate() {
-    return 1073741821 - (100 / 10 | 0)
-}
-
-function computeExpirationForFiber() {
-    return Sync
-}
-
-function enqueueUpdate(fiber, update) {
-    //更新后面
-    var updateQueue = fiber.updateQueue;
-    var sharedQueue = updateQueue.shared;
-    var pending = sharedQueue.pending;
-
-    if (pending === null) {
-        // This is the first update. Create a circular list.
-        update.next = update;
-    } else {
-        update.next = pending.next;
-        pending.next = update;
-    }
-
-    sharedQueue.pending = update;
-}
-
-function createWorkInProgress(current, pendingProps) {
-    var workInProgress = current.alternate;
-    if (workInProgress === null) {
-        // We use a double buffering pooling technique because we know that we'll
-        // only ever need at most two versions of a tree. We pool the "other" unused
-        // node that we're free to reuse. This is lazily created to avoid allocating
-        // extra objects for things that are never updated. It also allow us to
-        // reclaim the extra memory if needed.
-        workInProgress = createFiber(current.tag, pendingProps, current.key, current.mode);
-        workInProgress.elementType = current.elementType;
-        workInProgress.type = current.type;
-        workInProgress.stateNode = current.stateNode;
-        workInProgress.alternate = current;
-        current.alternate = workInProgress;
-    } else {
-        workInProgress.pendingProps = pendingProps; // We already have an alternate.
-        // Reset the effect tag.
-        workInProgress.effectTag = NoEffect; // The effect list is no longer valid.
-        workInProgress.nextEffect = null;
-        workInProgress.firstEffect = null;
-        workInProgress.lastEffect = null;
-    }
-
-    workInProgress.childExpirationTime = current.childExpirationTime;
-    workInProgress.expirationTime = current.expirationTime;
-    workInProgress.child = current.child;
-    workInProgress.memoizedProps = current.memoizedProps;
-    workInProgress.memoizedState = current.memoizedState;
-    workInProgress.updateQueue = current.updateQueue; // Clone the dependencies object. 
-    //This is mutated during the render phase, so
-    // it cannot be shared with the current fiber.
-    // var currentDependencies = current.dependencies;
-
-    workInProgress.sibling = current.sibling;
-    workInProgress.index = current.index;
-    workInProgress.ref = current.ref;
-
-    return workInProgress;
-}
-
-function prepareFreshStack(root, expirationTime) {
-    root.finishedWork = null;
-    root.finishedExpirationTime = NoWork;
-    //workInProgressRoot = root;
-    //workInProgress是全局变量
-    workInProgress = createWorkInProgress(root.current, null);
-}
-
-function cloneUpdateQueue(current, workInProgress) {
-
-    //不懂这个函数的作用
-    // Clone the update queue from current. Unless it's already a clone.
-    var queue = workInProgress.updateQueue;
-    var currentQueue = current.updateQueue;
-    if (queue === currentQueue) {
-        var clone = {
-            baseState: currentQueue.baseState,
-            baseQueue: currentQueue.baseQueue,
-            shared: currentQueue.shared,
-            effects: currentQueue.effects
-        };
-        workInProgress.updateQueue = clone;
-    }
-}
 
 function getStateFromUpdate(workInProgress, queue, update, prevState, nextProps, instance) {
     switch (update.tag) {
@@ -419,659 +561,13 @@ function getStateFromUpdate(workInProgress, queue, update, prevState, nextProps,
     return prevState;
 }
 
-function processUpdateQueue(workInProgress, props, instance, renderExpirationTime) {
-    //这个方法要做的事情，就是遍历这个 UpdateQueue ，
-    //然后计算出最后的新 State，然后存到workInProgress.memoizedState和 instance 中
-    var queue = workInProgress.updateQueue;
-    var baseQueue = queue.baseQueue; // The last pending update that hasn't been processed yet.
 
-    var pendingQueue = queue.shared.pending;
 
-    if (pendingQueue !== null) {
 
-        //将workInProgress.updateQueue中的pendingQueue赋值给 workInProgress.alternate.updateQueue.baseQueue
 
-        // We have new updates that haven't been processed yet.
-        // We'll add them to the base queue.
-        if (baseQueue !== null) {
-            // Merge the pending queue and the base queue.
-            var baseFirst = baseQueue.next;
-            var pendingFirst = pendingQueue.next;
-            baseQueue.next = pendingFirst;
-            pendingQueue.next = baseFirst;
-        }
 
-        baseQueue = pendingQueue;
-        queue.shared.pending = null;
 
-        var current = workInProgress.alternate;
 
-        if (current !== null) {
-            var currentQueue = current.updateQueue;
-
-            if (currentQueue !== null) {
-                currentQueue.baseQueue = pendingQueue;
-            }
-        }
-    }
-
-
-    if (baseQueue !== null) {
-        var first = baseQueue.next; // Iterate through the list of updates to compute the result.
-
-        var newState = queue.baseState;
-        var newExpirationTime = NoWork;
-        var newBaseState = null;
-        var newBaseQueueFirst = null;
-        var newBaseQueueLast = null;
-
-        if (first !== null) {
-            var update = first;
-
-            do {
-
-                newState = getStateFromUpdate(workInProgress, queue, update, newState, props, instance);
-
-                update = update.next;
-
-                if (update === null || update === first) {
-                    pendingQueue = queue.shared.pending;
-                    if (pendingQueue === null) {
-                        break;
-                    } else {
-                        // An update was scheduled from inside a reducer. Add the new
-                        // pending updates to the end of the list and keep processing.
-                        update = baseQueue.next = pendingQueue.next;
-                        pendingQueue.next = first;
-                        queue.baseQueue = baseQueue = pendingQueue;
-                        queue.shared.pending = null;
-                    }
-                }
-            } while (true);
-        }
-
-        if (newBaseQueueLast === null) {
-            newBaseState = newState;
-        } else {
-            newBaseQueueLast.next = newBaseQueueFirst;
-        }
-
-        queue.baseState = newBaseState;
-        queue.baseQueue = newBaseQueueLast;
-
-        workInProgress.expirationTime = newExpirationTime;
-        workInProgress.memoizedState = newState;
-    }
-
-
-}
-
-function createFiberFromElement(element, mode, expirationTime) {
-    var owner = null;
-
-    var type = element.type;
-    var key = element.key;
-    var pendingProps = element.props;
-    var fiber = createFiberFromTypeAndProps(type, key, pendingProps, owner, mode, expirationTime);
-
-    return fiber;
-}
-
-function createFiberFromFragment(elements, mode, expirationTime, key) {
-    var fiber = createFiber(Fragment, elements, key, mode);
-    fiber.expirationTime = expirationTime;
-    return fiber;
-}
-
-function createFiberFromTypeAndProps(type, // React$ElementType
-    key, pendingProps, owner, mode, expirationTime) {
-    var fiber;
-    var fiberTag; // The resolved type is set if we know what the final type will be. I.e. it's not lazy.
-
-    var resolvedType = type;
-
-    if (typeof type === 'function') {
-        fiberTag = ClassComponent;
-    } else if (typeof type === 'string') {
-        fiberTag = HostComponent;
-    } else {
-        getTag: switch (type) {
-            default: {
-
-            }
-        }
-    }
-
-    fiber = createFiber(fiberTag, pendingProps, key, mode);
-    fiber.elementType = type;
-    fiber.type = resolvedType;
-    fiber.expirationTime = expirationTime;
-    return fiber;
-}
-
-function createFiberFromText(content, mode, expirationTime) {
-    var fiber = createFiber(HostText, content, null, mode);
-    fiber.expirationTime = expirationTime;
-    return fiber;
-}
-
-function reconcileChildren(current, workInProgress, nextChildren, renderExpirationTime) {
-    if (current === null) {
-        workInProgress.child = mountChildFibers(workInProgress, null, nextChildren, renderExpirationTime);
-    } else {
-        workInProgress.child = reconcileChildFibers(workInProgress, current.child, nextChildren, renderExpirationTime);
-    }
-}
-
-var reconcileChildFibers = ChildReconciler(true);
-var mountChildFibers = ChildReconciler(false);
-
-function ChildReconciler(shouldTrackSideEffects) {
-
-
-    function deleteChild(returnFiber, childToDelete) {
-        if (!shouldTrackSideEffects) {
-            // Noop.
-            return;
-        } // Deletions are added in reversed order so we add it to the front.
-        // At this point, the return fiber's effect list is empty except for
-        // deletions, so we can just append the deletion to the list. The remaining
-        // effects aren't added until the complete phase. Once we implement
-        // resuming, this may not be true.
-
-
-        var last = returnFiber.lastEffect;
-
-        if (last !== null) {
-            last.nextEffect = childToDelete;
-            returnFiber.lastEffect = childToDelete;
-        } else {
-            returnFiber.firstEffect = returnFiber.lastEffect = childToDelete;
-        }
-
-        childToDelete.nextEffect = null;
-        childToDelete.effectTag = Deletion;
-    }
-
-    function deleteRemainingChildren(returnFiber, currentFirstChild) {
-        if (!shouldTrackSideEffects) {
-            // Noop.
-            return null;
-        } // TODO: For the shouldClone case, this could be micro-optimized a bit by
-        // assuming that after the first child we've already added everything.
-
-
-        var childToDelete = currentFirstChild;
-
-        while (childToDelete !== null) {
-            deleteChild(returnFiber, childToDelete);
-            childToDelete = childToDelete.sibling;
-        }
-
-        return null;
-    }
-
-    function placeSingleChild(newFiber) {
-        // This is simpler for the single child case. We only need to do a
-        // placement for inserting new children.
-        if (shouldTrackSideEffects && newFiber.alternate === null) {
-            newFiber.effectTag = Placement;
-        }
-
-        return newFiber;
-    }
-
-
-    function useFiber(fiber, pendingProps) {
-        // We currently set sibling to null and index to 0 here because it is easy
-        // to forget to do before returning it. E.g. for the single child case.
-        var clone = createWorkInProgress(fiber, pendingProps);
-        clone.index = 0;
-        clone.sibling = null;
-        return clone;
-    }
-
-    function placeChild(newFiber, lastPlacedIndex, newIndex) {
-        newFiber.index = newIndex;
-
-        if (!shouldTrackSideEffects) {
-            // Noop.
-            return lastPlacedIndex;
-        }
-
-        var current = newFiber.alternate;
-
-        if (current !== null) {
-            var oldIndex = current.index;
-
-            if (oldIndex < lastPlacedIndex) {
-                // This is a move.
-                newFiber.effectTag = Placement;
-                return lastPlacedIndex;
-            } else {
-                // This item can stay in place.
-                return oldIndex;
-            }
-        } else {
-            // This is an insertion.
-            newFiber.effectTag = Placement;
-            return lastPlacedIndex;
-        }
-    }
-
-
-    function reconcileSingleElement(returnFiber, currentFirstChild, element, expirationTime) {
-        var key = element.key;
-        var child = currentFirstChild;
-
-        var _created4 = createFiberFromElement(element, returnFiber.mode, expirationTime);
-        _created4.return = returnFiber;
-        return _created4;
-    }
-
-    function reconcileSingleTextNode(returnFiber, currentFirstChild, textContent, expirationTime) {
-
-        var created = createFiberFromText(textContent, returnFiber.mode, expirationTime);
-        created.return = returnFiber;
-
-        return created;
-    }
-
-    function updateTextNode(returnFiber, current, textContent, expirationTime) {
-        if (current === null || current.tag !== HostText) {
-            // Insert
-            var created = createFiberFromText(textContent, returnFiber.mode, expirationTime);
-            created.return = returnFiber;
-            return created;
-        } else {
-            // Update
-            var existing = useFiber(current, textContent);
-            existing.return = returnFiber;
-            return existing;
-        }
-    }
-
-    function updateElement(returnFiber, current, element, expirationTime) {
-        if (current !== null) {
-            if (current.elementType === element.type || ( // Keep this check inline so it only runs on the false path:
-                    isCompatibleFamilyForHotReloading(current, element))) {
-                // Move based on index
-                var existing = useFiber(current, element.props);
-                //existing.ref = coerceRef(returnFiber, current, element);
-                existing.return = returnFiber;
-                return existing;
-            }
-        } // Insert
-
-
-        var created = createFiberFromElement(element, returnFiber.mode, expirationTime);
-        // created.ref = coerceRef(returnFiber, current, element);
-        created.return = returnFiber;
-        return created;
-    }
-
-    function updatePortal(returnFiber, current, portal, expirationTime) {
-        if (current === null || current.tag !== HostPortal || current.stateNode.containerInfo !== portal.containerInfo || current.stateNode.implementation !== portal.implementation) {
-            // Insert
-            var created = createFiberFromPortal(portal, returnFiber.mode, expirationTime);
-            created.return = returnFiber;
-            return created;
-        } else {
-            // Update
-            var existing = useFiber(current, portal.children || []);
-            existing.return = returnFiber;
-            return existing;
-        }
-    }
-
-    function updateFragment(returnFiber, current, fragment, expirationTime, key) {
-        if (current === null || current.tag !== Fragment) {
-            // Insert
-            var created = createFiberFromFragment(fragment, returnFiber.mode, expirationTime, key);
-            created.return = returnFiber;
-            return created;
-        } else {
-            // Update
-            var existing = useFiber(current, fragment);
-            existing.return = returnFiber;
-            return existing;
-        }
-    }
-
-    function createChild(returnFiber, newChild, expirationTime) {
-        if (typeof newChild === 'string' || typeof newChild === 'number') {
-            // Text nodes don't have keys. If the previous node is implicitly keyed
-            // we can continue to replace it without aborting even if it is not a text
-            // node.
-            var created = createFiberFromText('' + newChild, returnFiber.mode, expirationTime);
-            created.return = returnFiber;
-            return created;
-        }
-
-        if (typeof newChild === 'object' && newChild !== null) {
-            switch (newChild.$$typeof) {
-                case REACT_ELEMENT_TYPE: {
-                    var _created = createFiberFromElement(newChild, returnFiber.mode, expirationTime);
-
-                    //_created.ref = coerceRef(returnFiber, null, newChild);
-                    _created.return = returnFiber;
-                    return _created;
-                }
-                /*  case REACT_PORTAL_TYPE: {
-                     var _created2 = createFiberFromPortal(newChild, returnFiber.mode, expirationTime);
-
-                     _created2.return = returnFiber;
-                     return _created2;
-                 } */
-            }
-            if (isArray$1(newChild)) {
-                var _created3 = createFiberFromFragment(newChild, returnFiber.mode, expirationTime, null);
-
-                _created3.return = returnFiber;
-                return _created3;
-            }
-        }
-
-        /* {
-            if (typeof newChild === 'function') {
-                warnOnFunctionType();
-            }
-        } */
-
-        return null;
-    }
-
-
-    function updateFromMap(existingChildren, returnFiber, newIdx, newChild, expirationTime) {
-        if (typeof newChild === 'string' || typeof newChild === 'number') {
-            // Text nodes don't have keys, so we neither have to check the old nor
-            // new node for the key. If both are text nodes, they match.
-            var matchedFiber = existingChildren.get(newIdx) || null;
-            return updateTextNode(returnFiber, matchedFiber, '' + newChild, expirationTime);
-        }
-
-        if (typeof newChild === 'object' && newChild !== null) {
-            switch (newChild.$$typeof) {
-                case REACT_ELEMENT_TYPE: {
-                    var _matchedFiber = existingChildren.get(newChild.key === null ? newIdx : newChild.key) || null;
-
-                    if (newChild.type === REACT_FRAGMENT_TYPE) {
-                        return updateFragment(returnFiber, _matchedFiber, newChild.props.children, expirationTime, newChild.key);
-                    }
-
-                    return updateElement(returnFiber, _matchedFiber, newChild, expirationTime);
-                }
-
-                /*  case REACT_PORTAL_TYPE: {
-                     var _matchedFiber2 = existingChildren.get(newChild.key === null ? newIdx : newChild.key) || null;
-
-                     return updatePortal(returnFiber, _matchedFiber2, newChild, expirationTime);
-                 } */
-            }
-
-            if (isArray$1(newChild)) {
-                var _matchedFiber3 = existingChildren.get(newIdx) || null;
-
-                return updateFragment(returnFiber, _matchedFiber3, newChild, expirationTime, null);
-            }
-        }
-        /* {
-            if (typeof newChild === 'function') {
-                warnOnFunctionType();
-            }
-        }
- */
-        return null;
-    }
-
-
-
-    function updateSlot(returnFiber, oldFiber, newChild, expirationTime) {
-        // Update the fiber if the keys match, otherwise return null.
-        var key = oldFiber !== null ? oldFiber.key : null;
-
-        if (typeof newChild === 'string' || typeof newChild === 'number') {
-            // Text nodes don't have keys. If the previous node is implicitly keyed
-            // we can continue to replace it without aborting even if it is not a text
-            // node.
-            if (key !== null) {
-                return null;
-            }
-
-            return updateTextNode(returnFiber, oldFiber, '' + newChild, expirationTime);
-        }
-
-        if (typeof newChild === 'object' && newChild !== null) {
-            switch (newChild.$$typeof) {
-                case REACT_ELEMENT_TYPE: {
-                    if (newChild.key === key) {
-                        /* if (newChild.type === REACT_FRAGMENT_TYPE) {
-                            return updateFragment(returnFiber, oldFiber, newChild.props.children, expirationTime, key);
-                        } */
-
-                        return updateElement(returnFiber, oldFiber, newChild, expirationTime);
-                    } else {
-                        return null;
-                    }
-                }
-
-                /* case REACT_PORTAL_TYPE: {
-                    if (newChild.key === key) {
-                        return updatePortal(returnFiber, oldFiber, newChild, expirationTime);
-                    } else {
-                        return null;
-                    }
-                } */
-            }
-
-            // if (isArray$1(newChild) || getIteratorFn(newChild)) {
-            if (isArray$1(newChild)) {
-                if (key !== null) {
-                    return null;
-                }
-
-                return updateFragment(returnFiber, oldFiber, newChild, expirationTime, null);
-            }
-
-
-        }
-
-
-        return null;
-    }
-
-
-    function reconcileChildrenArray(returnFiber, currentFirstChild, newChildren, expirationTime) {
-
-        var resultingFirstChild = null;
-        var previousNewFiber = null;
-        var oldFiber = currentFirstChild;
-        var lastPlacedIndex = 0;
-        var newIdx = 0;
-        var nextOldFiber = null;
-
-        for (; oldFiber !== null && newIdx < newChildren.length; newIdx++) {
-            if (oldFiber.index > newIdx) {
-                nextOldFiber = oldFiber;
-                oldFiber = null;
-            } else {
-                nextOldFiber = oldFiber.sibling;
-            }
-
-            var newFiber = updateSlot(returnFiber, oldFiber, newChildren[newIdx], expirationTime);
-
-            if (newFiber === null) {
-                // TODO: This breaks on empty slots like null children. That's
-                // unfortunate because it triggers the slow path all the time. We need
-                // a better way to communicate whether this was a miss or null,
-                // boolean, undefined, etc.
-                if (oldFiber === null) {
-                    oldFiber = nextOldFiber;
-                }
-
-                break;
-            }
-
-            if (shouldTrackSideEffects) {
-                if (oldFiber && newFiber.alternate === null) {
-                    // We matched the slot, but we didn't reuse the existing fiber, so we
-                    // need to delete the existing child.
-                    deleteChild(returnFiber, oldFiber);
-                }
-            }
-
-            lastPlacedIndex = placeChild(newFiber, lastPlacedIndex, newIdx);
-
-            if (previousNewFiber === null) {
-                // TODO: Move out of the loop. This only happens for the first run.
-                resultingFirstChild = newFiber;
-            } else {
-                // TODO: Defer siblings if we're not at the right index for this slot.
-                // I.e. if we had null values before, then we want to defer this
-                // for each null value. However, we also don't want to call updateSlot
-                // with the previous one.
-                previousNewFiber.sibling = newFiber;
-            }
-
-            previousNewFiber = newFiber;
-            oldFiber = nextOldFiber;
-        }
-
-        if (newIdx === newChildren.length) {
-            // We've reached the end of the new children. We can delete the rest.
-            deleteRemainingChildren(returnFiber, oldFiber);
-            return resultingFirstChild;
-        }
-
-        if (oldFiber === null) {
-            // If we don't have any more existing children we can choose a fast path
-            // since the rest will all be insertions.
-            for (; newIdx < newChildren.length; newIdx++) {
-                var _newFiber = createChild(returnFiber, newChildren[newIdx], expirationTime);
-
-                if (_newFiber === null) {
-                    continue;
-                }
-
-                lastPlacedIndex = placeChild(_newFiber, lastPlacedIndex, newIdx);
-
-                if (previousNewFiber === null) {
-                    // TODO: Move out of the loop. This only happens for the first run.
-                    resultingFirstChild = _newFiber;
-                } else {
-                    previousNewFiber.sibling = _newFiber;
-                }
-
-                previousNewFiber = _newFiber;
-            }
-
-            return resultingFirstChild;
-        } // Add all children to a key map for quick lookups.
-
-
-        var existingChildren = mapRemainingChildren(returnFiber, oldFiber); // Keep scanning and use the map to restore deleted items as moves.
-
-        for (; newIdx < newChildren.length; newIdx++) {
-            var _newFiber2 = updateFromMap(existingChildren, returnFiber, newIdx, newChildren[newIdx], expirationTime);
-
-            if (_newFiber2 !== null) {
-                if (shouldTrackSideEffects) {
-                    if (_newFiber2.alternate !== null) {
-                        // The new fiber is a work in progress, but if there exists a
-                        // current, that means that we reused the fiber. We need to delete
-                        // it from the child list so that we don't add it to the deletion
-                        // list.
-                        existingChildren.delete(_newFiber2.key === null ? newIdx : _newFiber2.key);
-                    }
-                }
-
-                lastPlacedIndex = placeChild(_newFiber2, lastPlacedIndex, newIdx);
-
-                if (previousNewFiber === null) {
-                    resultingFirstChild = _newFiber2;
-                } else {
-                    previousNewFiber.sibling = _newFiber2;
-                }
-                previousNewFiber = _newFiber2;
-            }
-        }
-
-        if (shouldTrackSideEffects) {
-            // Any existing children that weren't consumed above were deleted. We need
-            // to add them to the deletion list.
-            existingChildren.forEach(function (child) {
-                return deleteChild(returnFiber, child);
-            });
-        }
-
-        return resultingFirstChild;
-    }
-
-    function reconcileChildFibers(returnFiber, currentFirstChild, newChild, expirationTime) {
-        //根据子元素的类型，进行对象的处理
-        //如：类、数组、文本，改怎么判断和处理
-        var isObject = typeof newChild === 'object' && newChild !== null;
-        //子元素是对象时
-        //判断子元素的类型
-        if (isObject) {
-            switch (newChild.$$typeof) {
-                case REACT_ELEMENT_TYPE:
-                    //REACT_ELEMENT_TYPE=REACT_ELEMENT_TYPE
-                    return placeSingleChild(reconcileSingleElement(returnFiber, currentFirstChild, newChild, expirationTime));
-            }
-        }
-
-        if (typeof newChild === 'string' || typeof newChild === 'number') {
-            return placeSingleChild(reconcileSingleTextNode(returnFiber, currentFirstChild, '' + newChild, expirationTime));
-        }
-
-        if (Array.isArray(newChild)) {
-            console.log(newChild)
-            return reconcileChildrenArray(returnFiber, currentFirstChild, newChild, expirationTime);
-        }
-
-        return deleteRemainingChildren(returnFiber, currentFirstChild);
-
-
-    }
-
-    return reconcileChildFibers;
-}
-
-
-function forceUnmountCurrentAndReconcile(current, workInProgress, nextChildren, renderExpirationTime) {
-    // This function is fork of reconcileChildren. It's used in cases where we
-    // want to reconcile without matching against the existing set. This has the
-    // effect of all current children being unmounted; even if the type and key
-    // are the same, the old child is unmounted and a new child is created.
-    //
-    // To do this, we're going to go through the reconcile algorithm twice. In
-    // the first pass, we schedule a deletion for all the current children by
-    // passing null.
-    workInProgress.child = reconcileChildFibers(workInProgress, current.child, null, renderExpirationTime); // In the second pass, we mount the new children. The trick here is that we
-    // pass null in place of where we usually pass the current child set. This has
-    // the effect of remounting all children regardless of whether their
-    // identities match.
-
-    workInProgress.child = reconcileChildFibers(workInProgress, null, nextChildren, renderExpirationTime);
-}
-
-
-function updateHostRoot(current, workInProgress, renderExpirationTime) {
-    var nextProps = workInProgress.pendingProps;
-    var prevState = workInProgress.memoizedState;
-    var prevChildren = prevState !== null ? prevState.element : null;
-    //clone
-    cloneUpdateQueue(current, workInProgress);
-    //通过processUpdateQueue 计算新的state赋值到 fiber workInProgress.memoizedState 和 instance 上面记录
-    processUpdateQueue(workInProgress, nextProps, null, renderExpirationTime);
-
-    var nextState = workInProgress.memoizedState;
-    var nextChildren = nextState.element;
-
-    reconcileChildren(current, workInProgress, nextChildren, renderExpirationTime);
-    return workInProgress.child;
-}
 
 
 var classComponentUpdater = {}
@@ -1174,7 +670,6 @@ function mountClassInstance(workInProgress, ctor, newProps, renderExpirationTime
     //通过processUpdateQueue 计算新的state赋值到 fiber workInProgress.memoizedState 和 instance 上面记录
     processUpdateQueue(workInProgress, newProps, instance, renderExpirationTime);
     instance.state = workInProgress.memoizedState;
-
     //return
 
     //下面关于生命周期的暂时不关注
@@ -1321,25 +816,6 @@ function updateHostText(current, workInProgress) {
     return null;
 }
 
-function beginWork(current, workInProgress) {
-    let renderExpirationTime = 0;
-    //console.log("workInProgress.tag---", workInProgress.tag)
-    switch (workInProgress.tag) {
-        case ClassComponent: //1
-            var _Component2 = workInProgress.type;
-            var _unresolvedProps = workInProgress.pendingProps;
-            var _resolvedProps = workInProgress.elementType === _Component2 ? _unresolvedProps : resolveDefaultProps(_Component2, _unresolvedProps);
-            return updateClassComponent(current, workInProgress, _Component2, _resolvedProps, renderExpirationTime);
-        case HostRoot: //3
-            return updateHostRoot(current, workInProgress, renderExpirationTime);
-        case HostComponent: //5
-            // HostComponent = 5;
-            return updateHostComponent(current, workInProgress, renderExpirationTime);
-        case HostText: //6
-            return updateHostText(current, workInProgress);
-    }
-
-}
 
 
 function createElement(type, props, rootContainerElement, parentNamespace) {
@@ -1565,7 +1041,7 @@ function finalizeInitialChildren(domElement, type, props, rootContainerInstance,
 }
 
 function completeWork(current, workInProgress, renderExpirationTime) {
-    
+
     var newProps = workInProgress.pendingProps;
     switch (workInProgress.tag) {
         case ClassComponent: {
@@ -1684,8 +1160,6 @@ function completeUnitOfWork(unitOfWork) {
 
 
 
-
-
         var siblingFiber = workInProgress.sibling;
         // 有兄弟节点返回兄弟节点，继续走beinWork
         if (siblingFiber !== null) {
@@ -1697,25 +1171,9 @@ function completeUnitOfWork(unitOfWork) {
     return null;
 }
 
-function performUnitOfWork(unitOfWork) {
-    var current = unitOfWork.alternate;
-    var next;
-    next = beginWork(current, unitOfWork);
-    unitOfWork.memoizedProps = unitOfWork.pendingProps;
 
-    if (next === null) {
-        next = completeUnitOfWork(unitOfWork);
-    }
-    return next
-}
 
-function workLoopSync() {
-    let a = 0
-    while (workInProgress !== null) {
 
-        workInProgress = performUnitOfWork(workInProgress);
-    }
-}
 
 function performSyncWorkOnRoot(root) {
 
@@ -2547,76 +2005,857 @@ function commitRootImpl(root, renderPriorityLevel) {
     return null;
 }
 
-function scheduleWork(fiber, expirationTime) {
 
-    let root = fiber.stateNode;
-    if (expirationTime === Sync) {
-        //在 根目录上 执行 同步工作
-        performSyncWorkOnRoot(root);
-    } else {
 
+//↓↓↓↓↓↓--------***---------↓↓↓↓↓↓
+
+//↑↑↑↑↑↑--------***---------↑↑↑↑↑↑
+
+
+
+//↓↓↓↓↓↓--------reconcileChildren---------↓↓↓↓↓↓
+{
+
+    function reconcileChildren(current, workInProgress, nextChildren, renderExpirationTime) {
+        if (current === null) {
+            workInProgress.child = mountChildFibers(workInProgress, null, nextChildren, renderExpirationTime);
+        } else {
+            workInProgress.child = reconcileChildFibers(workInProgress, current.child, nextChildren, renderExpirationTime);
+        }
     }
 
-}
+    var reconcileChildFibers = ChildReconciler(true);
+    var mountChildFibers = ChildReconciler(false);
 
-function updateContainer(element, fiberRoot) {
-    /*  总结：
-      （1）获取节点对应的fiber对象
-      （2）计算currentTime
-      （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
-      （4）根据（3）expirationTime创建update对象
-      （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
-      （6）将callback赋值到（4）update.callback--未使用
-      （7）update入队updateQueue
-      （8）进行任务调度 
-    */
-
-    var current = fiberRoot.current;
-
-    /* currentTime 时间为 ：
-       调度器 Scheduler 的 系统当前时间 now/10，抹去10ms 的误差。
-       以上结果 |0，取整。
-       最大偏移量 MAGIC_NUMBER_OFFSET- 以上结果 
-       即：1073741821 - (now/10|0)。*/
-    var currentTime = requestCurrentTimeForUpdate();
+    function ChildReconciler(shouldTrackSideEffects) {
 
 
-    /* 
-      同步
-      expirationTime = Sync
-      交互事件，优先级较高
-      expirationTime = computeInteractiveExpiration(currentTime)
-      异步，优先级较低
-      expirationTime = computeAsyncExpiration(currentTime)
+        function deleteChild(returnFiber, childToDelete) {
+            if (!shouldTrackSideEffects) {
+                // Noop.
+                return;
+            } // Deletions are added in reversed order so we add it to the front.
+            // At this point, the return fiber's effect list is empty except for
+            // deletions, so we can just append the deletion to the list. The remaining
+            // effects aren't added until the complete phase. Once we implement
+            // resuming, this may not be true.
+
+
+            var last = returnFiber.lastEffect;
+
+            if (last !== null) {
+                last.nextEffect = childToDelete;
+                returnFiber.lastEffect = childToDelete;
+            } else {
+                returnFiber.firstEffect = returnFiber.lastEffect = childToDelete;
+            }
+
+            childToDelete.nextEffect = null;
+            childToDelete.effectTag = Deletion;
+        }
+
+        function deleteRemainingChildren(returnFiber, currentFirstChild) {
+            if (!shouldTrackSideEffects) {
+                // Noop.
+                return null;
+            } // TODO: For the shouldClone case, this could be micro-optimized a bit by
+            // assuming that after the first child we've already added everything.
+
+
+            var childToDelete = currentFirstChild;
+
+            while (childToDelete !== null) {
+                deleteChild(returnFiber, childToDelete);
+                childToDelete = childToDelete.sibling;
+            }
+
+            return null;
+        }
+
+        function placeSingleChild(newFiber) {
+            // This is simpler for the single child case. We only need to do a
+            // placement for inserting new children.
+            if (shouldTrackSideEffects && newFiber.alternate === null) {
+                newFiber.effectTag = Placement;
+            }
+
+            return newFiber;
+        }
+
+        function useFiber(fiber, pendingProps) {
+            // We currently set sibling to null and index to 0 here because it is easy
+            // to forget to do before returning it. E.g. for the single child case.
+            var clone = createWorkInProgress(fiber, pendingProps);
+            clone.index = 0;
+            clone.sibling = null;
+            return clone;
+        }
+
+        function placeChild(newFiber, lastPlacedIndex, newIndex) {
+            newFiber.index = newIndex;
+
+            if (!shouldTrackSideEffects) {
+                // Noop.
+                return lastPlacedIndex;
+            }
+
+            var current = newFiber.alternate;
+
+            if (current !== null) {
+                var oldIndex = current.index;
+
+                if (oldIndex < lastPlacedIndex) {
+                    // This is a move.
+                    newFiber.effectTag = Placement;
+                    return lastPlacedIndex;
+                } else {
+                    // This item can stay in place.
+                    return oldIndex;
+                }
+            } else {
+                // This is an insertion.
+                newFiber.effectTag = Placement;
+                return lastPlacedIndex;
+            }
+        }
+
+        function reconcileSingleElement(returnFiber, currentFirstChild, element, expirationTime) {
+            var key = element.key;
+            var child = currentFirstChild;
+
+            var _created4 = createFiberFromElement(element, returnFiber.mode, expirationTime);
+            _created4.return = returnFiber;
+            return _created4;
+        }
+
+        function reconcileSingleTextNode(returnFiber, currentFirstChild, textContent, expirationTime) {
+
+            var created = createFiberFromText(textContent, returnFiber.mode, expirationTime);
+            created.return = returnFiber;
+
+            return created;
+        }
+
+        function updateTextNode(returnFiber, current, textContent, expirationTime) {
+            if (current === null || current.tag !== HostText) {
+                // Insert
+                var created = createFiberFromText(textContent, returnFiber.mode, expirationTime);
+                created.return = returnFiber;
+                return created;
+            } else {
+                // Update
+                var existing = useFiber(current, textContent);
+                existing.return = returnFiber;
+                return existing;
+            }
+        }
+
+        function updateElement(returnFiber, current, element, expirationTime) {
+            if (current !== null) {
+                if (current.elementType === element.type || ( // Keep this check inline so it only runs on the false path:
+                        isCompatibleFamilyForHotReloading(current, element))) {
+                    // Move based on index
+                    var existing = useFiber(current, element.props);
+                    //existing.ref = coerceRef(returnFiber, current, element);
+                    existing.return = returnFiber;
+                    return existing;
+                }
+            } // Insert
+
+
+            var created = createFiberFromElement(element, returnFiber.mode, expirationTime);
+            // created.ref = coerceRef(returnFiber, current, element);
+            created.return = returnFiber;
+            return created;
+        }
+
+        function updatePortal(returnFiber, current, portal, expirationTime) {
+            if (current === null || current.tag !== HostPortal || current.stateNode.containerInfo !== portal.containerInfo || current.stateNode.implementation !== portal.implementation) {
+                // Insert
+                var created = createFiberFromPortal(portal, returnFiber.mode, expirationTime);
+                created.return = returnFiber;
+                return created;
+            } else {
+                // Update
+                var existing = useFiber(current, portal.children || []);
+                existing.return = returnFiber;
+                return existing;
+            }
+        }
+
+        function updateFragment(returnFiber, current, fragment, expirationTime, key) {
+            if (current === null || current.tag !== Fragment) {
+                // Insert
+                var created = createFiberFromFragment(fragment, returnFiber.mode, expirationTime, key);
+                created.return = returnFiber;
+                return created;
+            } else {
+                // Update
+                var existing = useFiber(current, fragment);
+                existing.return = returnFiber;
+                return existing;
+            }
+        }
+
+        function createChild(returnFiber, newChild, expirationTime) {
+            if (typeof newChild === 'string' || typeof newChild === 'number') {
+                // Text nodes don't have keys. If the previous node is implicitly keyed
+                // we can continue to replace it without aborting even if it is not a text
+                // node.
+                var created = createFiberFromText('' + newChild, returnFiber.mode, expirationTime);
+                created.return = returnFiber;
+                return created;
+            }
+
+            if (typeof newChild === 'object' && newChild !== null) {
+                switch (newChild.$$typeof) {
+                    case REACT_ELEMENT_TYPE: {
+                        var _created = createFiberFromElement(newChild, returnFiber.mode, expirationTime);
+
+                        //_created.ref = coerceRef(returnFiber, null, newChild);
+                        _created.return = returnFiber;
+                        return _created;
+                    }
+                    /*  case REACT_PORTAL_TYPE: {
+                         var _created2 = createFiberFromPortal(newChild, returnFiber.mode, expirationTime);
+    
+                         _created2.return = returnFiber;
+                         return _created2;
+                     } */
+                }
+                if (isArray$1(newChild)) {
+                    var _created3 = createFiberFromFragment(newChild, returnFiber.mode, expirationTime, null);
+
+                    _created3.return = returnFiber;
+                    return _created3;
+                }
+            }
+
+            /* {
+                if (typeof newChild === 'function') {
+                    warnOnFunctionType();
+                }
+            } */
+
+            return null;
+        }
+
+        function updateFromMap(existingChildren, returnFiber, newIdx, newChild, expirationTime) {
+            if (typeof newChild === 'string' || typeof newChild === 'number') {
+                // Text nodes don't have keys, so we neither have to check the old nor
+                // new node for the key. If both are text nodes, they match.
+                var matchedFiber = existingChildren.get(newIdx) || null;
+                return updateTextNode(returnFiber, matchedFiber, '' + newChild, expirationTime);
+            }
+
+            if (typeof newChild === 'object' && newChild !== null) {
+                switch (newChild.$$typeof) {
+                    case REACT_ELEMENT_TYPE: {
+                        var _matchedFiber = existingChildren.get(newChild.key === null ? newIdx : newChild.key) || null;
+
+                        if (newChild.type === REACT_FRAGMENT_TYPE) {
+                            return updateFragment(returnFiber, _matchedFiber, newChild.props.children, expirationTime, newChild.key);
+                        }
+
+                        return updateElement(returnFiber, _matchedFiber, newChild, expirationTime);
+                    }
+
+                    /*  case REACT_PORTAL_TYPE: {
+                         var _matchedFiber2 = existingChildren.get(newChild.key === null ? newIdx : newChild.key) || null;
+    
+                         return updatePortal(returnFiber, _matchedFiber2, newChild, expirationTime);
+                     } */
+                }
+
+                if (isArray$1(newChild)) {
+                    var _matchedFiber3 = existingChildren.get(newIdx) || null;
+
+                    return updateFragment(returnFiber, _matchedFiber3, newChild, expirationTime, null);
+                }
+            }
+            /* {
+                if (typeof newChild === 'function') {
+                    warnOnFunctionType();
+                }
+            }
      */
+            return null;
+        }
 
-    var expirationTime = computeExpirationForFiber(currentTime, current);
-    //因为 expirationTime 指的就是一个任务的过期时间，React 根据任务的优先级和当前时间来计算出一个任务的执行截止时间。
-    //只要这个值比当前时间大就可以一直让 React 延后这个任务的执行，以便让更高优先级的任务执行,
-    //但是一旦过了任务的截止时间，就必须让这个任务马上执行。
-    //任务的过期时间是通过当前时间加上一个常量（任务优先级不同常量不同）计算出来的
-    var update = createUpdate(expirationTime);
-    update.payload = {
-        element: element
-    };
+        function updateSlot(returnFiber, oldFiber, newChild, expirationTime) {
+            // Update the fiber if the keys match, otherwise return null.
+            var key = oldFiber !== null ? oldFiber.key : null;
 
-    //2、将刚创建的update对象入队到fiber.updateQueue队列中
-    enqueueUpdate(current, update);
+            if (typeof newChild === 'string' || typeof newChild === 'number') {
+                // Text nodes don't have keys. If the previous node is implicitly keyed
+                // we can continue to replace it without aborting even if it is not a text
+                // node.
+                if (key !== null) {
+                    return null;
+                }
 
-    //3、开始进入React异步渲染的核心：React Scheduler
-    //安排工作----重要
-    scheduleWork(current, expirationTime);
-    return expirationTime;
+                return updateTextNode(returnFiber, oldFiber, '' + newChild, expirationTime);
+            }
+
+            if (typeof newChild === 'object' && newChild !== null) {
+                switch (newChild.$$typeof) {
+                    case REACT_ELEMENT_TYPE: {
+                        if (newChild.key === key) {
+                            /* if (newChild.type === REACT_FRAGMENT_TYPE) {
+                                return updateFragment(returnFiber, oldFiber, newChild.props.children, expirationTime, key);
+                            } */
+
+                            return updateElement(returnFiber, oldFiber, newChild, expirationTime);
+                        } else {
+                            return null;
+                        }
+                    }
+
+                    /* case REACT_PORTAL_TYPE: {
+                        if (newChild.key === key) {
+                            return updatePortal(returnFiber, oldFiber, newChild, expirationTime);
+                        } else {
+                            return null;
+                        }
+                    } */
+                }
+
+                // if (isArray$1(newChild) || getIteratorFn(newChild)) {
+                if (isArray$1(newChild)) {
+                    if (key !== null) {
+                        return null;
+                    }
+
+                    return updateFragment(returnFiber, oldFiber, newChild, expirationTime, null);
+                }
+
+
+            }
+
+
+            return null;
+        }
+
+        function reconcileChildrenArray(returnFiber, currentFirstChild, newChildren, expirationTime) {
+
+            var resultingFirstChild = null;
+            var previousNewFiber = null;
+            var oldFiber = currentFirstChild;
+            var lastPlacedIndex = 0;
+            var newIdx = 0;
+            var nextOldFiber = null;
+
+            for (; oldFiber !== null && newIdx < newChildren.length; newIdx++) {
+                if (oldFiber.index > newIdx) {
+                    nextOldFiber = oldFiber;
+                    oldFiber = null;
+                } else {
+                    nextOldFiber = oldFiber.sibling;
+                }
+
+                var newFiber = updateSlot(returnFiber, oldFiber, newChildren[newIdx], expirationTime);
+
+                if (newFiber === null) {
+                    // TODO: This breaks on empty slots like null children. That's
+                    // unfortunate because it triggers the slow path all the time. We need
+                    // a better way to communicate whether this was a miss or null,
+                    // boolean, undefined, etc.
+                    if (oldFiber === null) {
+                        oldFiber = nextOldFiber;
+                    }
+
+                    break;
+                }
+
+                if (shouldTrackSideEffects) {
+                    if (oldFiber && newFiber.alternate === null) {
+                        // We matched the slot, but we didn't reuse the existing fiber, so we
+                        // need to delete the existing child.
+                        deleteChild(returnFiber, oldFiber);
+                    }
+                }
+
+                lastPlacedIndex = placeChild(newFiber, lastPlacedIndex, newIdx);
+
+                if (previousNewFiber === null) {
+                    // TODO: Move out of the loop. This only happens for the first run.
+                    resultingFirstChild = newFiber;
+                } else {
+                    // TODO: Defer siblings if we're not at the right index for this slot.
+                    // I.e. if we had null values before, then we want to defer this
+                    // for each null value. However, we also don't want to call updateSlot
+                    // with the previous one.
+                    previousNewFiber.sibling = newFiber;
+                }
+
+                previousNewFiber = newFiber;
+                oldFiber = nextOldFiber;
+            }
+
+            if (newIdx === newChildren.length) {
+                // We've reached the end of the new children. We can delete the rest.
+                deleteRemainingChildren(returnFiber, oldFiber);
+                return resultingFirstChild;
+            }
+
+            if (oldFiber === null) {
+                // If we don't have any more existing children we can choose a fast path
+                // since the rest will all be insertions.
+                for (; newIdx < newChildren.length; newIdx++) {
+                    var _newFiber = createChild(returnFiber, newChildren[newIdx], expirationTime);
+
+                    if (_newFiber === null) {
+                        continue;
+                    }
+
+                    lastPlacedIndex = placeChild(_newFiber, lastPlacedIndex, newIdx);
+
+                    if (previousNewFiber === null) {
+                        // TODO: Move out of the loop. This only happens for the first run.
+                        resultingFirstChild = _newFiber;
+                    } else {
+                        previousNewFiber.sibling = _newFiber;
+                    }
+
+                    previousNewFiber = _newFiber;
+                }
+
+                return resultingFirstChild;
+            } // Add all children to a key map for quick lookups.
+
+
+            var existingChildren = mapRemainingChildren(returnFiber, oldFiber); // Keep scanning and use the map to restore deleted items as moves.
+
+            for (; newIdx < newChildren.length; newIdx++) {
+                var _newFiber2 = updateFromMap(existingChildren, returnFiber, newIdx, newChildren[newIdx], expirationTime);
+
+                if (_newFiber2 !== null) {
+                    if (shouldTrackSideEffects) {
+                        if (_newFiber2.alternate !== null) {
+                            // The new fiber is a work in progress, but if there exists a
+                            // current, that means that we reused the fiber. We need to delete
+                            // it from the child list so that we don't add it to the deletion
+                            // list.
+                            existingChildren.delete(_newFiber2.key === null ? newIdx : _newFiber2.key);
+                        }
+                    }
+
+                    lastPlacedIndex = placeChild(_newFiber2, lastPlacedIndex, newIdx);
+
+                    if (previousNewFiber === null) {
+                        resultingFirstChild = _newFiber2;
+                    } else {
+                        previousNewFiber.sibling = _newFiber2;
+                    }
+                    previousNewFiber = _newFiber2;
+                }
+            }
+
+            if (shouldTrackSideEffects) {
+                // Any existing children that weren't consumed above were deleted. We need
+                // to add them to the deletion list.
+                existingChildren.forEach(function (child) {
+                    return deleteChild(returnFiber, child);
+                });
+            }
+
+            return resultingFirstChild;
+        }
+
+        function reconcileChildFibers(returnFiber, currentFirstChild, newChild, expirationTime) {
+            //根据子元素的类型，进行对象的处理
+            //如：类、数组、文本，改怎么判断和处理
+            var isObject = typeof newChild === 'object' && newChild !== null;
+            //子元素是对象时
+            //判断子元素的类型
+            if (isObject) {
+                switch (newChild.$$typeof) {
+                    case REACT_ELEMENT_TYPE:
+                        //REACT_ELEMENT_TYPE=REACT_ELEMENT_TYPE
+                        return placeSingleChild(reconcileSingleElement(returnFiber, currentFirstChild, newChild, expirationTime));
+                }
+            }
+
+            if (typeof newChild === 'string' || typeof newChild === 'number') {
+                return placeSingleChild(reconcileSingleTextNode(returnFiber, currentFirstChild, '' + newChild, expirationTime));
+            }
+
+            if (Array.isArray(newChild)) {
+                console.log(newChild)
+                return reconcileChildrenArray(returnFiber, currentFirstChild, newChild, expirationTime);
+            }
+
+            return deleteRemainingChildren(returnFiber, currentFirstChild);
+
+
+        }
+
+        return reconcileChildFibers;
+    }
+
+
+    function forceUnmountCurrentAndReconcile(current, workInProgress, nextChildren, renderExpirationTime) {
+        // This function is fork of reconcileChildren. It's used in cases where we
+        // want to reconcile without matching against the existing set. This has the
+        // effect of all current children being unmounted; even if the type and key
+        // are the same, the old child is unmounted and a new child is created.
+        //
+        // To do this, we're going to go through the reconcile algorithm twice. In
+        // the first pass, we schedule a deletion for all the current children by
+        // passing null.
+        workInProgress.child = reconcileChildFibers(workInProgress, current.child, null, renderExpirationTime);
+        // In the second pass, we mount the new children. The trick here is that we
+        // pass null in place of where we usually pass the current child set. This has
+        // the effect of remounting all children regardless of whether their
+        // identities match.
+
+        workInProgress.child = reconcileChildFibers(workInProgress, null, nextChildren, renderExpirationTime);
+    }
 
 }
+//↑↑↑↑↑↑--------reconcileChildren---------↑↑↑↑↑↑
 
-ReactDOM.render = function (element, container, callback) {
 
-    var root = container._reactRootContainer;
-    var fiberRoot;
-    if (!root) {
-        root = container._reactRootContainer = legacyCreateRootFromDOMContainer(container)
-        fiberRoot = root._internalRoot;
-        updateContainer(element, fiberRoot);
+//↓↓↓↓↓↓--------beginWork---------↓↓↓↓↓↓
+{
+
+    //↓↓↓↓↓↓--------workInProgress.tag为fiber根组件---------↓↓↓↓↓↓
+    {
+        function updateHostRoot(current, workInProgress, renderExpirationTime) {
+            var nextProps = workInProgress.pendingProps;
+            var prevState = workInProgress.memoizedState;
+            var prevChildren = prevState !== null ? prevState.element : null;
+            //clone
+            cloneUpdateQueue(current, workInProgress);
+            //通过processUpdateQueue 计算新的state赋值到 fiber workInProgress.memoizedState 和 instance 上面记录
+            processUpdateQueue(workInProgress, nextProps, null, renderExpirationTime);
+
+            var nextState = workInProgress.memoizedState;
+            var nextChildren = nextState.element;
+
+            reconcileChildren(current, workInProgress, nextChildren, renderExpirationTime);
+            return workInProgress.child;
+        }
+
+    }
+    //↓↓↓↓↓↓--------workInProgress.tag为fiber根组件---------↓↓↓↓↓↓
+
+
+
+
+    //↓↓↓↓↓↓--------workInProgress.tag为客户端元素---------↓↓↓↓↓↓
+    {
+
+    }
+    //↓↓↓↓↓↓--------workInProgress.tag为客户端元素---------↓↓↓↓↓↓
+
+
+
+
+    //↓↓↓↓↓↓--------workInProgress.tag为class组件---------↓↓↓↓↓↓
+    {
+
+    }
+    //↓↓↓↓↓↓--------workInProgress.tag为class组件---------↓↓↓↓↓↓
+
+
+
+
+
+    //↓↓↓↓↓↓--------workInProgress.tag为文本---------↓↓↓↓↓↓
+    {
+
+    }
+    //↓↓↓↓↓↓--------workInProgress.tag为文本---------↓↓↓↓↓↓
+
+
+
+    function beginWork(current, workInProgress) {
+        let renderExpirationTime = 0;
+        //console.log("workInProgress.tag---", workInProgress.tag)
+        switch (workInProgress.tag) {
+            case ClassComponent: //1
+                var _Component2 = workInProgress.type;
+                var _unresolvedProps = workInProgress.pendingProps;
+                var _resolvedProps = workInProgress.elementType === _Component2 ? _unresolvedProps : resolveDefaultProps(_Component2, _unresolvedProps);
+                return updateClassComponent(current, workInProgress, _Component2, _resolvedProps, renderExpirationTime);
+            case HostRoot: //3
+                return updateHostRoot(current, workInProgress, renderExpirationTime);
+            case HostComponent: //5
+                // HostComponent = 5;
+                return updateHostComponent(current, workInProgress, renderExpirationTime);
+            case HostText: //6
+                return updateHostText(current, workInProgress);
+        }
+
+    }
+
+}
+//↑↑↑↑↑↑--------beginWork---------↑↑↑↑↑↑
+
+
+
+//↓↓↓↓↓↓--------分析用户的代码结构，完成fiber树的构建---------↓↓↓↓↓↓
+{
+    //执行每一个workInProgress携带的工作
+    function performUnitOfWork(unitOfWork) {
+        var current = unitOfWork.alternate;
+        var next;
+        next = beginWork(current, unitOfWork);
+        unitOfWork.memoizedProps = unitOfWork.pendingProps;
+
+        if (next === null) {
+            next = completeUnitOfWork(unitOfWork);
+        }
+        return next
+    }
+
+    //workInProgress存在值，即存在工作，那么就一直执行工作performUnitOfWork(workInProgress)
+    //直到workInProgress携带的工作做完
+    function workLoopSync() {
+        let a = 0
+        while (workInProgress !== null) {
+
+            workInProgress = performUnitOfWork(workInProgress);
+        }
+    }
+
+}
+//↑↑↑↑↑↑--------分析用户的代码结构，完成fiber树的构建---------↑↑↑↑↑↑
+
+
+//↓↓↓↓↓↓--------workInProgress的初始化---------↓↓↓↓↓↓
+{
+    //根据root.curren创建workInProgress
+    //root.curren就是fiber树的根节点，fiberRoot.current
+    function prepareFreshStack(root, expirationTime) {
+        root.finishedWork = null;
+        root.finishedExpirationTime = NoWork;
+        //workInProgressRoot = root;
+        //workInProgress是全局变量
+        workInProgress = createWorkInProgress(root.current, null);
+    }
+
+    //根据传递的current，即一个fiber结构，创建workInProgres对象。workInProgress对象是对该fiber结构的改造和扩展
+    //如果，依赖的fiber对象的alternate没有值，就创建一个fiber,并赋值
+    //如果，依赖的fiber对象的alternate有值，workInProgress = current.alternate
+
+    //workInProgress就是一个fiber节点，它的effectTag、nextEffect、firstEffect、lastEffect等关于前后节点的操作等一开始都为空。
+    //但是workInProgress会共享它创建所依赖的current节点的状态，如tag，elementType，type，stateNode，child，updateQueue....等状态
+    //workInProgress依赖current创建，所以workInProgress的过去版本就是current
+    function createWorkInProgress(current, pendingProps) {
+        var workInProgress = current.alternate;
+        if (workInProgress === null) {
+            // We use a double buffering pooling technique because we know that we'll
+            // only ever need at most two versions of a tree. We pool the "other" unused
+            // node that we're free to reuse. This is lazily created to avoid allocating
+            // extra objects for things that are never updated. It also allow us to
+            // reclaim the extra memory if needed.
+            workInProgress = createFiber(current.tag, pendingProps, current.key, current.mode);
+            workInProgress.elementType = current.elementType;
+            workInProgress.type = current.type;
+            workInProgress.stateNode = current.stateNode;
+            workInProgress.alternate = current;
+            current.alternate = workInProgress;
+        } else {
+            workInProgress.pendingProps = pendingProps; // We already have an alternate.
+            // Reset the effect tag.
+            workInProgress.effectTag = NoEffect; // The effect list is no longer valid.
+            workInProgress.nextEffect = null;
+            workInProgress.firstEffect = null;
+            workInProgress.lastEffect = null;
+        }
+
+        workInProgress.childExpirationTime = current.childExpirationTime;
+        workInProgress.expirationTime = current.expirationTime;
+        workInProgress.child = current.child;
+        workInProgress.memoizedProps = current.memoizedProps;
+        workInProgress.memoizedState = current.memoizedState;
+        workInProgress.updateQueue = current.updateQueue; // Clone the dependencies object. 
+        //This is mutated during the render phase, so
+        // it cannot be shared with the current fiber.
+        // var currentDependencies = current.dependencies;
+
+        workInProgress.sibling = current.sibling;
+        workInProgress.index = current.index;
+        workInProgress.ref = current.ref;
+
+        return workInProgress;
     }
 }
+//↑↑↑↑↑↑--------workInProgress的初始化---------↑↑↑↑↑↑
+
+
+
+//↓↓↓↓↓↓--------render主流程---------↓↓↓↓↓↓
+{
+    /**
+     * 
+     * 从fiber根节点开始，同步渲染
+     * 1，prepareFreshStack声明workInProgress即第一个工作单元的初始值
+     * 2，workLoopSync 分析代码的fiber结构，完成fiber树的构建
+     * 3，finishSyncRender 将fiber树渲染到容器中
+     * 
+     * diiff在哪里？
+     * 第一次render,不需要diff
+     * 
+     */
+    function performSyncWorkOnRoot(root) {
+        //root指的是fiberRoot，fiber数据结构的根节点
+
+
+        var expirationTime = Sync;
+
+        //给全局的workInProgress变量赋值
+        //第一次的workInProgress的值，就是根据fiberRoot.current创建的，就是HostRoot,下一个根据<APP/>
+        //
+        prepareFreshStack(root, expirationTime);
+
+        //完成workInProgress携带的工作 ，即完成fiber分析
+        workLoopSync()
+
+        console.log(document.getElementById('root')._reactRootContainer)
+        //commitfiber
+        root.finishedWork = root.current.alternate;
+        root.finishedExpirationTime = expirationTime;
+
+
+        finishSyncRender(root);
+
+        return null;
+
+    }
+
+    //安排工作
+    //expirationTime === Sync执行同步渲染。浏览器端就是这里
+    function scheduleWork(fiber, expirationTime) {
+        debugger
+        let root = fiber.stateNode;
+        //这里的fiber参数，传递的是fiberRoot.current
+        //而fiberRoot.current.stateNode仍然指向fiberRoot----- legacyCreateRootFromDOMContainer函数里面指定的，uninitializedFiber.stateNode = root;
+        //所以这里的root就是fiberRoot
+
+        //搞得好绕，总之：root指的是fiberRoot，fiber数据结构的根节点
+        if (expirationTime === Sync) {
+            // 在根目录上执行同步工作
+            performSyncWorkOnRoot(root);
+        } else {
+            // 
+        }
+
+    }
+
+    function updateContainer(element, fiberRoot) {
+        /*  总结：
+          （1）获取节点对应的fiber对象
+          （2）计算currentTime---本版本暂时不管时间
+          （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime---本版本暂时不管时间
+          （4）根据（3）expirationTime创建update对象---本版本暂时不管时间
+          （5）ReactDOM.render要的渲染元素element赋值给update.payload
+          //（5）将setState中要更新的对象赋值到（4）update.payload，
+          （6）将callback赋值到（4）update.callback-------未使用，不管
+          （7）update入队updateQueue
+          （8）进行任务调度 ---本版本暂时不管调度，顺序执行。
+        */
+
+
+
+        var current = fiberRoot.current;
+
+        /* currentTime 时间为 ：
+           调度器 Scheduler 的 系统当前时间 now/10，抹去10ms 的误差。
+           以上结果 |0，取整。
+           最大偏移量 MAGIC_NUMBER_OFFSET- 以上结果 
+           即：1073741821 - (now/10|0)。*/
+
+        //本版本暂时不管这个时间，我随便赋值。
+        var currentTime = requestCurrentTimeForUpdate();
+
+
+        /* 
+          同步
+          expirationTime = Sync
+          交互事件，优先级较高
+          expirationTime = computeInteractiveExpiration(currentTime)
+          异步，优先级较低
+          expirationTime = computeAsyncExpiration(currentTime)
+         */
+
+        //本版本暂时不管这个时间，我随便赋值为Sync。
+        var expirationTime = computeExpirationForFiber(currentTime, current);
+        //因为 expirationTime 指的就是一个任务的过期时间，React 根据任务的优先级和当前时间来计算出一个任务的执行截止时间。
+        //只要这个值比当前时间大就可以一直让 React 延后这个任务的执行，以便让更高优先级的任务执行,
+        //但是一旦过了任务的截止时间，就必须让这个任务马上执行。
+        //任务的过期时间是通过当前时间加上一个常量（任务优先级不同常量不同）计算出来的
+        var update = createUpdate(expirationTime);
+
+
+        //update更新对象的更新材料是element,就是 <APP/>经过jsx和react解析后的结构。React.createElement()的结果
+        update.payload = {
+            element: element
+        };
+
+        //2、将刚创建的update对象入队到fiber.updateQueue队列中
+        //排队更新，新的更新任务插队fiber.updateQueue的最前面
+        enqueueUpdate(current, update);
+
+        //3、开始进入React渲染的核心：React Scheduler
+        //安排工作----重要
+        scheduleWork(current, expirationTime);
+        return expirationTime;
+
+    }
+
+    //在dom容器中，创建fiber数据结构的根结点。
+    function legacyCreateRootFromDOMContainer(container) {
+        var rootSibling;
+
+        //清楚容器内部的节点
+        //我们在创建ReactDOM.render入口的时候，说DOM组件内应该为空。即使不为空也会被清空
+        while (rootSibling = container.lastChild) {
+            container.removeChild(rootSibling);
+        }
+
+        var root = new FiberRootNode(container)
+
+        //创建fiber树的第一个节点，HostRoot = 3
+        var uninitializedFiber = createFiber(HostRoot = 3, null, null);
+
+
+        ///fiber根节点的current属性，指向fiber节点，这个fiber节点将会是会面的我们代码定义的fiber节点.
+        //fiber根节点的第一个fiber子节点的stateNode属性，指向fiber的根节点
+        uninitializedFiber.stateNode = root;
+        //root.current = uninitializedFiber;
+        root.current = uninitializedFiber;
+
+        //初始化fiber节点的updateQueue属性。更新包的初始化挂载
+        //即fiber.updateQueue已经有一个对象结构
+        initializeUpdateQueue(uninitializedFiber);
+        return {
+            _internalRoot: root
+        }
+
+    }
+
+    //入口函数，从这里开始执行raect-dom的逻辑
+    ReactDOM.render = function (element, container, callback) {
+        var root = container._reactRootContainer;
+        var fiberRoot;
+        if (!root) {
+            //创建fiber树，包含fiber根节点和一个fiber节点
+            root = container._reactRootContainer = legacyCreateRootFromDOMContainer(container)
+            //root._reactRootContainer._internalRoot指向fiber结构的根节点，即下面的fiberRoot。
+            //根节点里面包含很多信息，如container这个DOM元素信息。
+
+            //fiberRoot.current指向第一个fiber节点。
+            //这第一个fiber节点的stateNode指向fiberRoot根节点。
+            //这里互相指引，很绕。记住fiberRoot.current就是根节点挂载的fiber树。
+            fiberRoot = root._internalRoot;
+
+
+            //根据传递的element和刚创建的初始fiber数据机构，渲染或更新container容器内容
+            updateContainer(element, fiberRoot);
+        }
+    }
+}
+//↑↑↑↑↑↑--------render主流程---------↑↑↑↑↑↑
