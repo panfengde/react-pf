@@ -16,8 +16,6 @@ const ReactElement = function (type, key, ref, props) {
 
 
 
-
-
 React.createElement = function (type, config, children) {
     var props = {};
     var key = null;

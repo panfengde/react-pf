@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+
+    <div>今晚：<span id='go'></span></div>
+    <script>
+
+        var txt = document.getElementById("go")
+        txt.innerText = "喝"
+        function go(time) {
+            //space += 10;
+            console.log(time)
+            if (time < 3000) {
+                setTimeout(() => {
+                    if (Math.random() > 0.5) {
+                        txt.innerText = "喝"
+                    } else {
+                        txt.innerText = "不喝"
+                    }
+                    window.requestAnimationFrame(go);
+                }, time / 20)
+            }
+        }
+        window.requestAnimationFrame(go);
+
+    </script>
+</body>
+
+</html>
