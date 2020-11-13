@@ -1,7 +1,10 @@
+//↓↓↓↓↓↓--------***---------↓↓↓↓↓↓
+//↑↑↑↑↑↑--------***---------↑↑↑↑↑↑
+
 const ReactDOM = {}
 var workInProgress = null; //工作单元代理变量
 var nextEffect = null;
-
+var REACT_ELEMENT_TYPE = Symbol.for('react.element')
 
 //↓↓↓↓↓↓--------关于时间的常量---------↓↓↓↓↓↓
 {
@@ -37,62 +40,65 @@ var nextEffect = null;
 
     var NoEffect =
         /*              */
-        0;
+        0; //0
     var PerformedWork =
         /*         */
-        1;
+        1; //1
     // You can change the rest (and add more).
 
     var Placement =
         /*             */
-        2;
+        2; //10
     var Update =
         /*                */
-        4;
+        4; //100
     var PlacementAndUpdate =
         /*    */
-        6;
+        6; //110
     var Deletion =
         /*              */
-        8;
+        8; //1000
     var ContentReset =
         /*          */
-        16;
+        16; //10000
     var Callback =
         /*              */
-        32;
+        32; //100000
     var DidCapture =
         /*            */
-        64;
+        64; // 1000000
     var Ref =
         /*                   */
-        128;
+        128; //1000000000
     var Snapshot =
         /*              */
-        256;
+        256; //10000000000
     var Passive =
         /*               */
-        512;
+        512; //10000000100
     var Hydrating =
         /*             */
-        1024;
+        1024; //10000000000
     var HydratingAndUpdate =
         /*    */
-        1028; // Passive & Update & Callback & Ref & Snapshot
+        1028; //1110100100
+    // Passive & Update & Callback & Ref & Snapshot
 
     var LifecycleEffectMask =
         /*   */
-        932; // Union of all host effects
+        932; //1110100100
+    // Union of all host effects
 
     var HostEffectMask =
         /*        */
-        2047;
+        2047; //11111111111
     var Incomplete =
         /*            */
-        2048;
+        2048; //100000000000
+
     var ShouldCapture =
         /*         */
-        4096;
+        4096; //1000000000000
 }
 //↑↑↑↑↑↑--------关于操作和副作用的常量---------↑↑↑↑↑↑
 
@@ -109,11 +115,54 @@ var nextEffect = null;
 //↑↑↑↑↑↑--------还不知道作用的常量---------↑↑↑↑↑↑
 
 
-//↓↓↓↓↓↓--------***---------↓↓↓↓↓↓
-//↑↑↑↑↑↑--------***---------↑↑↑↑↑↑
 
 
-var REACT_ELEMENT_TYPE = Symbol.for('react.element')
+//↓↓↓↓↓↓--------生命周期---------↓↓↓↓↓↓
+{
+    function applyDerivedStateFromProps(workInProgress, ctor, getDerivedStateFromProps, nextProps) {
+        var prevState = workInProgress.memoizedState;
+
+
+        var partialState = getDerivedStateFromProps(nextProps, prevState);
+
+
+        var memoizedState = partialState === null || partialState === undefined ? prevState : _assign({}, prevState, partialState);
+        workInProgress.memoizedState = memoizedState; // Once the update queue is empty, persist the derived state onto the
+        // base state.
+
+        if (workInProgress.expirationTime === NoWork) {
+            // Queue is always non-null for classes
+            var updateQueue = workInProgress.updateQueue;
+            updateQueue.baseState = memoizedState;
+        }
+    }
+
+
+    function callComponentWillMount(workInProgress, instance) {
+        // startPhaseTimer(workInProgress, 'componentWillMount');
+        var oldState = instance.state;
+
+        if (typeof instance.componentWillMount === 'function') {
+            instance.componentWillMount();
+        }
+
+        if (typeof instance.UNSAFE_componentWillMount === 'function') {
+            instance.UNSAFE_componentWillMount();
+        }
+
+        //stopPhaseTimer();
+
+        if (oldState !== instance.state) {
+            {
+                console.error('componentWillMount')
+            }
+
+            //classComponentUpdater.enqueueReplaceState(instance, instance.state, null);
+        }
+    }
+}
+
+//↑↑↑↑↑↑--------生命周期---------↑↑↑↑↑↑
 
 
 
@@ -182,10 +231,17 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
         }
     }
 
+
+    function appendChild(parentInstance, child) {
+        parentInstance.appendChild(child);
+    }
+
+    function insertBefore(parentInstance, child, beforeChild) {
+        parentInstance.insertBefore(child, beforeChild);
+    }
+
 }
 //↑↑↑↑↑↑--------工具函数---------↑↑↑↑↑↑
-
-
 
 
 //↓↓↓↓↓↓--------关于fiber节点的函数---------↓↓↓↓↓↓
@@ -361,6 +417,75 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
 
         return fiber;
     }
+
+    function isHostParent(fiber) {
+        return fiber.tag === HostComponent || fiber.tag === HostRoot || fiber.tag === HostPortal;
+    }
+
+    //向上查找，返回是 DOM 元素的父节点(如果不是dom元素，如是class元素就不是dom，继续网上找。HostComponent，HostRoot可以)
+    function getHostParentFiber(fiber) {
+        var parent = fiber.return;
+
+        while (parent !== null) {
+            if (isHostParent(parent)) {
+                return parent;
+            }
+
+            parent = parent.return;
+        }
+    }
+
+    function getHostSibling(fiber) {
+
+
+        // We're going to search forward into the tree until we find a sibling host
+        // node. Unfortunately, if multiple insertions are done in a row we have to
+        // search past them. This leads to exponential search for the next sibling.
+        // TODO: Find a more efficient way to do this.
+        var node = fiber;
+        //循环，找到所有子节点
+        siblings: while (true) {
+            // If we didn't find anything, let's try the next sibling.
+            while (node.sibling === null) {
+                if (node.return === null || isHostParent(node.return)) {
+                    // If we pop out of the root or hit the parent the fiber we are the
+                    // last sibling.
+                    return null;
+                }
+
+                node = node.return;
+            }
+
+            node.sibling.return = node.return;
+            node = node.sibling;
+
+            while (node.tag !== HostComponent && node.tag !== HostText && node.tag !== DehydratedFragment) {
+                // If it is not host node and, we might have a host node inside it.
+                // Try to search down until we find one.
+                if (node.effectTag & Placement) {
+                    // If we don't have a child, try the siblings instead.
+                    continue siblings;
+                } // If we don't have a child, try the siblings instead.
+                // We also skip portals because they are not part of this host tree.
+
+
+                if (node.child === null || node.tag === HostPortal) {
+                    continue siblings;
+                } else {
+                    node.child.return = node;
+                    node = node.child;
+                }
+            } // Check if this host node is stable or about to be placed.
+
+
+            if (!(node.effectTag & Placement)) {
+                // Found it!
+                return node.stateNode;
+            }
+        }
+    }
+
+
 }
 //↑↑↑↑↑↑--------关于fiber节点的创建---------↑↑↑↑↑↑
 
@@ -580,1098 +705,960 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
 
     }
 
+    function getStateFromUpdate(workInProgress, queue, update, prevState, nextProps, instance) {
+        switch (update.tag) {
+            case 0: {
+                //UpdateState=0
+
+                var _payload = update.payload;
+                var partialState;
+
+                if (typeof _payload === 'function') {
+                    // Updater function
+
+                } else {
+                    // Partial state object
+                    partialState = _payload;
+                }
+
+                if (partialState === null || partialState === undefined) {
+                    // Null and undefined are treated as no-ops.
+                    return prevState;
+                } // Merge the partial state and the previous state.
+
+
+                return {
+                    ...prevState,
+                    ...partialState
+                };
+            }
+        }
+
+        return prevState;
+    }
+
 }
 //↑↑↑↑↑↑--------关于update对象的函数---------↑↑↑↑↑↑
 
 
+//↓↓↓↓↓↓--------关于DOM的操作---------↓↓↓↓↓↓
+{
+    //将该 DOM 节点的 value 设置为 ''
+    function resetTextContent(domElement) {
+        setTextContent(domElement, '');
+    }
+    //重置文字内容
+    function commitResetTextContent(current) {
 
+        resetTextContent(current.stateNode);
+    }
 
+    function setTextContent(node, text) {
+        if (text) {
+            var firstChild = node.firstChild;
 
-
-
-
-
-
-function getStateFromUpdate(workInProgress, queue, update, prevState, nextProps, instance) {
-    switch (update.tag) {
-        case 0: {
-            //UpdateState=0
-
-            var _payload = update.payload;
-            var partialState;
-
-            if (typeof _payload === 'function') {
-                // Updater function
-
-            } else {
-                // Partial state object
-                partialState = _payload;
+            if (firstChild && firstChild === node.lastChild && firstChild.nodeType === 3) {
+                //TEXT_NODE=3
+                firstChild.nodeValue = text;
+                return;
             }
+        }
 
-            if (partialState === null || partialState === undefined) {
-                // Null and undefined are treated as no-ops.
-                return prevState;
-            } // Merge the partial state and the previous state.
+        node.textContent = text;
+    };
 
+    function commitDetachRef(current) {
+        var currentRef = current.ref;
 
-            return {
-                ...prevState,
-                ...partialState
-            };
+        if (currentRef !== null) {
+            if (typeof currentRef === 'function') {
+                currentRef(null);
+            } else {
+                currentRef.current = null;
+            }
         }
     }
 
-    return prevState;
-}
+    function commitTextUpdate(textInstance, oldText, newText) {
+        textInstance.nodeValue = newText;
+    }
 
+
+    function updateProperties(domElement, updatePayload, tag, lastRawProps, nextRawProps) {
+        // Update checked *before* name.
+        // In the middle of an update, it is possible to have multiple checked.
+        // When a checked radio tries to change name, browser makes another radio's checked false.
+        if (tag === 'input' && nextRawProps.type === 'radio' && nextRawProps.name != null) {
+            updateChecked(domElement, nextRawProps);
+        }
+
+        var wasCustomComponentTag = isCustomComponent(tag, lastRawProps);
+        var isCustomComponentTag = isCustomComponent(tag, nextRawProps); // Apply the diff.
+
+        updateDOMProperties(domElement, updatePayload, wasCustomComponentTag, isCustomComponentTag); // TODO: Ensure that an update gets scheduled if any of the special props
+        // changed.
+
+        switch (tag) {
+            case 'input':
+                // Update the wrapper around inputs *after* updating props. This has to
+                // happen after `updateDOMProperties`. Otherwise HTML5 input validations
+                // raise warnings and prevent the new value from being assigned.
+                updateWrapper(domElement, nextRawProps);
+                break;
+
+            case 'textarea':
+                updateWrapper$1(domElement, nextRawProps);
+                break;
+
+            case 'select':
+                // <select> value update needs to occur after <option> children
+                // reconciliation
+                postUpdateWrapper(domElement, nextRawProps);
+                break;
+        }
+    }
+
+
+    function updateDOMProperties(domElement, updatePayload, wasCustomComponentTag, isCustomComponentTag) {
+        // TODO: Handle wasCustomComponentTag
+        for (var i = 0; i < updatePayload.length; i += 2) {
+            var propKey = updatePayload[i];
+            var propValue = updatePayload[i + 1];
+
+            if (propKey === STYLE) {
+                setValueForStyles(domElement, propValue);
+            } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
+                setInnerHTML(domElement, propValue);
+            } else if (propKey === CHILDREN) {
+                setTextContent(domElement, propValue);
+            } else {
+                setValueForProperty(domElement, propKey, propValue, isCustomComponentTag);
+            }
+        }
+    }
+
+
+    function setInnerHTML(node, html) {
+        node.innerHTML = html;
+    }
+
+    function setValueForProperty(node, name, value, isCustomComponentTag) {
+
+        /* 
+              if (attributeNamespace) {
+                node.setAttributeNS(attributeNamespace, attributeName, attributeValue);
+              } else {
+                node.setAttribute(attributeName, attributeValue);
+              } */
+
+    }
+
+    function createTextNode(text, rootContainerElement) {
+        return document.createTextNode(text);
+    }
+
+    function createTextInstance(text) {
+        var textNode = createTextNode(text);
+        return textNode;
+    }
+
+    function dangerousStyleValue(name, value, isCustomProperty) {
+        var isEmpty = value == null || typeof value === 'boolean' || value === '';
+
+        if (isEmpty) {
+            return '';
+        }
+
+        if (!isCustomProperty && typeof value === 'number' && value !== 0 && !(isUnitlessNumber.hasOwnProperty(name) && isUnitlessNumber[name])) {
+            return value + 'px'; // Presumes implicit 'px' suffix for unitless numbers
+        }
+
+        return ('' + value).trim();
+    }
+
+    function setValueForStyles(node, styles) {
+        var style = node.style;
+
+        for (var styleName in styles) {
+            if (!styles.hasOwnProperty(styleName)) {
+                continue;
+            }
+
+            var isCustomProperty = styleName.indexOf('--') === 0;
+
+
+            var styleValue = dangerousStyleValue(styleName, styles[styleName], isCustomProperty);
+
+            if (styleName === 'float') {
+                styleName = 'cssFloat';
+            }
+
+            if (isCustomProperty) {
+                style.setProperty(styleName, styleValue);
+            } else {
+                style[styleName] = styleValue;
+            }
+        }
+    }
+
+
+}
+//↑↑↑↑↑↑--------关于DOM的操作---------↑↑↑↑↑↑
 
 var classComponentUpdater = {}
 
-// var classComponentUpdater = {
-//     isMounted: isMounted,
-//     enqueueSetState: function (inst, payload, callback) {
-//         //
-//         console.log(++xxx_panfeng, "操作了多少次setstate")
-//         var fiber = get(inst);
-//         var currentTime = requestCurrentTimeForUpdate();
-//         var suspenseConfig = requestCurrentSuspenseConfig();
-//         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
-//         var update = createUpdate(expirationTime, suspenseConfig);
-//         update.payload = payload;
-
-//         if (callback !== undefined && callback !== null) {
-//             {
-//                 warnOnInvalidCallback(callback, 'setState');
-//             }
-
-//             update.callback = callback;
-//         }
-
-//         enqueueUpdate(fiber, update);
-//         scheduleWork(fiber, expirationTime);
-
-//         //上面和ReactDOM.render中scheduleRootUpdate非常的相似。其实他们就是同一个更新原理呢
-//         /*  （1）获取节点对应的fiber对象
-//            （2）计算currentTime
-//            （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
-//            （4）根据（3）expirationTime创建update对象
-//            （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
-//            （6）将callback赋值到（4）update.callback
-//            （7）update入队updateQueue
-//            （8）进行任务调度 
-//          */
-//     },
-//     enqueueReplaceState: function (inst, payload, callback) {
-//         var fiber = get(inst);
-//         var currentTime = requestCurrentTimeForUpdate();
-//         var suspenseConfig = requestCurrentSuspenseConfig();
-//         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
-//         var update = createUpdate(expirationTime, suspenseConfig);
-//         update.tag = ReplaceState;
-//         update.payload = payload;
-
-//         if (callback !== undefined && callback !== null) {
-//             {
-//                 warnOnInvalidCallback(callback, 'replaceState');
-//             }
-
-//             update.callback = callback;
-//         }
-
-//         enqueueUpdate(fiber, update);
-//         scheduleWork(fiber, expirationTime);
-//     },
-//     enqueueForceUpdate: function (inst, callback) {
-//         var fiber = get(inst);
-//         var currentTime = requestCurrentTimeForUpdate();
-//         var suspenseConfig = requestCurrentSuspenseConfig();
-//         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
-//         var update = createUpdate(expirationTime, suspenseConfig);
-//         update.tag = ForceUpdate;
-
-//         if (callback !== undefined && callback !== null) {
-//             {
-//                 warnOnInvalidCallback(callback, 'forceUpdate');
-//             }
-
-//             update.callback = callback;
-//         }
-
-//         enqueueUpdate(fiber, update);
-//         scheduleWork(fiber, expirationTime);
-
-//         /*  （1）获取节点对应的fiber对象
-//             （2）计算currentTime
-//             （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
-//             （4）根据（3）expirationTime创建update对象
-//             （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
-//             （6）将callback赋值到（4）update.callback
-//             （7）update入队updateQueue
-//             （8）进行任务调度 
-//           */
-//     }
-// };
 
 
-
-function shouldSetTextContent(type, props) {
-    return type === 'textarea' || type === 'option' || type === 'noscript' || typeof props.children === 'string' || typeof props.children === 'number' || typeof props.dangerouslySetInnerHTML === 'object' && props.dangerouslySetInnerHTML !== null && props.dangerouslySetInnerHTML.__html != null;
-}
-
-
-function createTextNode(text, rootContainerElement) {
-    return document.createTextNode(text);
-}
-
-function createTextInstance(text) {
-
-    var textNode = createTextNode(text);
-
-    return textNode;
-}
-
-
-function dangerousStyleValue(name, value, isCustomProperty) {
-    var isEmpty = value == null || typeof value === 'boolean' || value === '';
-
-    if (isEmpty) {
-        return '';
+//↓↓↓↓↓↓--------finishSyncRender---------↓↓↓↓↓↓
+{
+    //render分析完成，生成fiber树，开始渲染工作。
+    function finishSyncRender(root) {
+        // Set this to null to indicate there's no in-progress render.
+        // workInProgressRoot = null;
+        commitRoot(root);
     }
 
-    if (!isCustomProperty && typeof value === 'number' && value !== 0 && !(isUnitlessNumber.hasOwnProperty(name) && isUnitlessNumber[name])) {
-        return value + 'px'; // Presumes implicit 'px' suffix for unitless numbers
-    }
-
-    return ('' + value).trim();
-}
-
-function setValueForStyles(node, styles) {
-    var style = node.style;
-
-    for (var styleName in styles) {
-        if (!styles.hasOwnProperty(styleName)) {
-            continue;
-        }
-
-        var isCustomProperty = styleName.indexOf('--') === 0;
-
-
-        var styleValue = dangerousStyleValue(styleName, styles[styleName], isCustomProperty);
-
-        if (styleName === 'float') {
-            styleName = 'cssFloat';
-        }
-
-        if (isCustomProperty) {
-            style.setProperty(styleName, styleValue);
-        } else {
-            style[styleName] = styleValue;
-        }
-    }
-}
-
-function setTextContent(node, text) {
-    if (text) {
-        var firstChild = node.firstChild;
-
-        if (firstChild && firstChild === node.lastChild && firstChild.nodeType === 3) {
-            //TEXT_NODE=3
-            firstChild.nodeValue = text;
-            return;
-        }
-    }
-
-    node.textContent = text;
-};
-
-function setInitialDOMProperties(tag, domElement, rootContainerElement, nextProps, isCustomComponentTag) {
-    for (var propKey in nextProps) {
-        if (!nextProps.hasOwnProperty(propKey)) {
-            continue;
-        }
-        var nextProp = nextProps[propKey];
-        if (propKey === "style") {
-            {
-                if (nextProp) {
-                    // Freeze the next style object so that we can assume it won't be
-                    // mutated. We have already warned for this in the past.
-                    Object.freeze(nextProp);
-                }
-            } // Relies on `updateStylesByID` not mutating `styleUpdates`.
-
-            setValueForStyles(domElement, nextProp);
-        } else if (propKey === "dangerouslySetInnerHTML") {
-            var nextHtml = nextProp ? nextProp[HTML$1] : undefined;
-
-            if (nextHtml != null) {
-                //setInnerHTML(domElement, nextHtml);
-                domElement.innerHTML = nextHtml;
-            }
-        } else if (propKey === 'children') {
-            if (typeof nextProp === 'string') {
-                // Avoid setting initial textContent when the text is empty. In IE11 setting
-                // textContent on a <textarea> will cause the placeholder to not
-                // show within the <textarea> until it has been focused and blurred again.
-                // https://github.com/facebook/react/issues/6731#issuecomment-254874553
-                var canSetTextContent = tag !== 'textarea' || nextProp !== '';
-
-                if (canSetTextContent) {
-                    setTextContent(domElement, nextProp);
-                }
-            } else if (typeof nextProp === 'number') {
-                setTextContent(domElement, '' + nextProp);
-            }
-        }
-    }
-}
-
-
-function performSyncWorkOnRoot(root) {
-
-    var expirationTime = Sync;
-
-
-    //给全局的workInProgress变量赋值
-    prepareFreshStack(root, expirationTime);
-
-    //完成fiber分析
-    workLoopSync()
-
-    console.log(document.getElementById('root')._reactRootContainer)
-    //commitfiber
-    root.finishedWork = root.current.alternate;
-    root.finishedExpirationTime = expirationTime;
-
-
-    finishSyncRender(root);
-
-    return null;
-
-}
-
-
-function finishSyncRender(root) {
-    // Set this to null to indicate there's no in-progress render.
-    // workInProgressRoot = null;
-    commitRoot(root);
-}
-
-function commitRoot(root) {
-    commitRootImpl(root, renderPriorityLevel = null);
-    return null;
-    //https://mp.weixin.qq.com/s?__biz=MzU1MDg1NTQ5NQ==&mid=2247484630&idx=1&sn=89a58e3eee0a37a53d2be14215a2276c&chksm=fb9b72feccecfbe8ec62eb2bd2beb85bbf97559d705ddd53d00e0d08d1a5c2391cca722fea3a&scene=21#wechat_redirect
-
-    //渲染优先级
-    //ImmediatePriority，优先级为 99，最高优先级，立即执行
-    //bind函数，请看：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Function/bind
-    //获取调度优先级，并临时替换当前的优先级，去执行传进来的 callback
-    var renderPriorityLevel = getCurrentPriorityLevel();
-    //获取调度优先级，并临时替换当前的优先级，去执行传进来的 callback
-    //由于ImmediatePriority是最高等级的优先级，所以会立即执行commitRootImpl()方法
-    runWithPriority$1(ImmediatePriority, commitRootImpl.bind(null, root, renderPriorityLevel));
-    return null;
-}
-
-
-function commitBeforeMutationEffects() {
-    while (nextEffect !== null) {
-        var effectTag = nextEffect.effectTag;
-        if ((effectTag & Snapshot) !== NoEffect) {
-            var current = nextEffect.alternate;
-            commitBeforeMutationLifeCycles(current, nextEffect);
-        }
-
-        if ((effectTag & Passive) !== NoEffect) {
-            // If there are passive effects, schedule a callback to flush at
-            // the earliest opportunity.
-
-            /*
-
-            感觉是：getSnapshotBeforeUpdate函数有副作用时，去改变副作用
-            
-            if (!rootDoesHavePassiveEffects) {
-                  rootDoesHavePassiveEffects = true;
-                  scheduleCallback(NormalPriority, function () {
-                      flushPassiveEffects();
-                      return null;
-                  });
-              }   
-            */
-
-        }
-
-        nextEffect = nextEffect.nextEffect;
-
-    }
-}
-
-
-function commitBeforeMutationLifeCycles(current, finishedWork) {
-    switch (finishedWork.tag) {
-        case FunctionComponent:
-        case ForwardRef:
-        case SimpleMemoComponent:
-        case Block: {
-            return;
-        }
-
-        case ClassComponent: {
-            if (finishedWork.effectTag & Snapshot) {
-                if (current !== null) {
-                    var prevProps = current.memoizedProps;
-                    var prevState = current.memoizedState;
-
-                    var instance = finishedWork.stateNode; // We could update instance props and state here,
-                    // but instead we rely on them being set during last render.
-                    // TODO: revisit this when we implement resuming.
-
-                    //var snapshot = instance.getSnapshotBeforeUpdate(finishedWork.elementType === finishedWork.type ? prevProps : resolveDefaultProps(finishedWork.type, prevProps), prevState);
-                    var snapshot = instance.getSnapshotBeforeUpdate("hello-getSnapshotBeforeUpdate");
-                    instance.__reactInternalSnapshotBeforeUpdate = snapshot;
-                }
-            }
-
-            return;
-        }
-
-        case HostRoot:
-        case HostComponent:
-        case HostText:
-        case HostPortal:
-        case IncompleteClassComponent:
-            // Nothing to do for these component types
-            return;
-    }
-}
-
-//将该 DOM 节点的 value 设置为 ''
-function resetTextContent(domElement) {
-    setTextContent(domElement, '');
-}
-//重置文字内容
-function commitResetTextContent(current) {
-
-    resetTextContent(current.stateNode);
-}
-
-function commitDetachRef(current) {
-    var currentRef = current.ref;
-
-    if (currentRef !== null) {
-        if (typeof currentRef === 'function') {
-            currentRef(null);
-        } else {
-            currentRef.current = null;
-        }
-    }
-}
-
-function isHostParent(fiber) {
-    return fiber.tag === HostComponent || fiber.tag === HostRoot || fiber.tag === HostPortal;
-}
-
-function getHostParentFiber(fiber) {
-    var parent = fiber.return;
-
-    while (parent !== null) {
-        if (isHostParent(parent)) {
-            return parent;
-        }
-
-        parent = parent.return;
-    }
-}
-
-function getHostSibling(fiber) {
-    //将fiber树递归转换为dom结构
-
-    // We're going to search forward into the tree until we find a sibling host
-    // node. Unfortunately, if multiple insertions are done in a row we have to
-    // search past them. This leads to exponential search for the next sibling.
-    // TODO: Find a more efficient way to do this.
-    var node = fiber;
-    //循环，找到所有子节点
-    siblings: while (true) {
-        // If we didn't find anything, let's try the next sibling.
-        while (node.sibling === null) {
-            if (node.return === null || isHostParent(node.return)) {
-                // If we pop out of the root or hit the parent the fiber we are the
-                // last sibling.
-                return null;
-            }
-
-            node = node.return;
-        }
-
-        node.sibling.return = node.return;
-        node = node.sibling;
-
-        while (node.tag !== HostComponent && node.tag !== HostText && node.tag !== DehydratedFragment) {
-            // If it is not host node and, we might have a host node inside it.
-            // Try to search down until we find one.
-            if (node.effectTag & Placement) {
-                // If we don't have a child, try the siblings instead.
-                continue siblings;
-            } // If we don't have a child, try the siblings instead.
-            // We also skip portals because they are not part of this host tree.
-
-
-            if (node.child === null || node.tag === HostPortal) {
-                continue siblings;
-            } else {
-                node.child.return = node;
-                node = node.child;
-            }
-        } // Check if this host node is stable or about to be placed.
-
-
-        if (!(node.effectTag & Placement)) {
-            // Found it!
-            return node.stateNode;
-        }
-    }
-}
-
-function insertInContainerBefore(container, child, beforeChild) {
-    if (container.nodeType === COMMENT_NODE) {
-        container.parentNode.insertBefore(child, beforeChild);
-    } else {
-        container.insertBefore(child, beforeChild);
-    }
-}
-
-function appendChildToContainer(container, child) {
-
-    var parentNode;
-
-    if (container.nodeType === COMMENT_NODE) {
-        parentNode = container.parentNode;
-        parentNode.insertBefore(child, container);
-    } else {
-        parentNode = container;
-        parentNode.appendChild(child);
-    } // This container might be used for a portal.
-}
-
-function insertOrAppendPlacementNodeIntoContainer(node, before, parent) {
-
-    var tag = node.tag;
-    var isHost = tag === HostComponent || tag === HostText;
-
-    if (isHost) {
-        //stateNode是整理好的dom树结构，可以之间insert进dom中
-        var stateNode = isHost ? node.stateNode : node.stateNode.instance;
-
-        if (before) {
-            insertInContainerBefore(parent, stateNode, before);
-        } else {
-            appendChildToContainer(parent, stateNode);
-        }
-    } else if (tag === HostPortal);
-    else {
-        var child = node.child;
-
-        if (child !== null) {
-
-            insertOrAppendPlacementNodeIntoContainer(child, before, parent);
-            var sibling = child.sibling;
-
-            while (sibling !== null) {
-                insertOrAppendPlacementNodeIntoContainer(sibling, before, parent);
-                sibling = sibling.sibling;
-            }
-        }
-    }
-}
-
-function commitPlacement(finishedWork) {
-
-    console.log(finishedWork)
-
-    //向上循环祖先节点，返回是 DOM 元素的父节点(如果不是dom元素，如是class元素就不是dom，继续网上找)
-    var parentFiber = getHostParentFiber(finishedWork); // Note: these two variables *must* always be updated together.
-
-    var parent;
-    var isContainer;
-    var parentStateNode = parentFiber.stateNode;
-
-    switch (parentFiber.tag) {
-        //如果是 DOM 元素的话
-        case HostComponent:
-            //获取对应的 DOM 节点
-            parent = parentStateNode;
-            isContainer = false;
-            break;
-            //如果是 fiberRoot 节点的话，
-        case HostRoot:
-            parent = parentStateNode.containerInfo;
-            isContainer = true;
-            break;
-
-        case HostPortal:
-            parent = parentStateNode.containerInfo;
-            isContainer = true;
-            break;
-
-        case FundamentalComponent:
-
-            // eslint-disable-next-line-no-fallthrough
-
-        default: {
-            {
-                throw Error("Invalid host parent fiber. This error is likely caused by a bug in React. Please file an issue.");
-            }
-        }
-
-    }
-    //如果父节点是文本节点的话
-    if (parentFiber.effectTag & ContentReset) {
-        // Reset the text content of the parent before doing any insertions
-        //在进行任何插入操作前，需要先将 value 置为 ''
-        resetTextContent(parent); // Clear ContentReset from the effect tag
-        //再清除掉 ContentReset 这个 effectTag
-        parentFiber.effectTag &= ~ContentReset;
-    }
-    //查找插入节点的位置，也就是获取它后一个 DOM 兄弟节点的位置
-    var before = getHostSibling(finishedWork); // We only have the top Fiber that was inserted but we need to recurse down its
-    // children to find all the terminal nodes.
-    //我们只有插入的Fiber，但需要向下递归
-    //子节点查找所有终端节点。
-
-
-    console.log(before)
-    if (isContainer) {
-        insertOrAppendPlacementNodeIntoContainer(finishedWork, before, parent);
-    } else {
-        insertOrAppendPlacementNode(finishedWork, before, parent);
-    }
-}
-
-function updateProperties(domElement, updatePayload, tag, lastRawProps, nextRawProps) {
-    // Update checked *before* name.
-    // In the middle of an update, it is possible to have multiple checked.
-    // When a checked radio tries to change name, browser makes another radio's checked false.
-    if (tag === 'input' && nextRawProps.type === 'radio' && nextRawProps.name != null) {
-        updateChecked(domElement, nextRawProps);
-    }
-
-    var wasCustomComponentTag = isCustomComponent(tag, lastRawProps);
-    var isCustomComponentTag = isCustomComponent(tag, nextRawProps); // Apply the diff.
-
-    updateDOMProperties(domElement, updatePayload, wasCustomComponentTag, isCustomComponentTag); // TODO: Ensure that an update gets scheduled if any of the special props
-    // changed.
-
-    switch (tag) {
-        case 'input':
-            // Update the wrapper around inputs *after* updating props. This has to
-            // happen after `updateDOMProperties`. Otherwise HTML5 input validations
-            // raise warnings and prevent the new value from being assigned.
-            updateWrapper(domElement, nextRawProps);
-            break;
-
-        case 'textarea':
-            updateWrapper$1(domElement, nextRawProps);
-            break;
-
-        case 'select':
-            // <select> value update needs to occur after <option> children
-            // reconciliation
-            postUpdateWrapper(domElement, nextRawProps);
-            break;
-    }
-}
-
-function setInnerHTML(node, html) {
-    node.innerHTML = html;
-}
-
-function setValueForProperty(node, name, value, isCustomComponentTag) {
-
-    /* 
-          if (attributeNamespace) {
-            node.setAttributeNS(attributeNamespace, attributeName, attributeValue);
-          } else {
-            node.setAttribute(attributeName, attributeValue);
-          } */
-
-}
-
-function updateDOMProperties(domElement, updatePayload, wasCustomComponentTag, isCustomComponentTag) {
-    // TODO: Handle wasCustomComponentTag
-    for (var i = 0; i < updatePayload.length; i += 2) {
-        var propKey = updatePayload[i];
-        var propValue = updatePayload[i + 1];
-
-        if (propKey === STYLE) {
-            setValueForStyles(domElement, propValue);
-        } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
-            setInnerHTML(domElement, propValue);
-        } else if (propKey === CHILDREN) {
-            setTextContent(domElement, propValue);
-        } else {
-            setValueForProperty(domElement, propKey, propValue, isCustomComponentTag);
-        }
-    }
-}
-
-function commitUpdate(domElement, updatePayload, type, oldProps, newProps, internalInstanceHandle) {
-    // Update the props handle so that we know which props are the ones with
-    // with current event handlers.
-    // Apply the diff to the DOM node.
-
-    domElement.__reactEventHandlers = newProps
-
-    updateProperties(domElement, updatePayload, type, oldProps, newProps);
-}
-
-function commitWork(current, finishedWork) {
-
-    switch (finishedWork.tag) {
-        case FunctionComponent:
-            //case ForwardRef:
-            //case MemoComponent:
-            // case SimpleMemoComponent:
-            /*  case Block: {
-              
-               commitHookEffectListUnmount(Layout | HasEffect, finishedWork);
-               return;
-             } */
-
-        case ClassComponent: {
-            return;
-        }
-
-        case HostComponent: {
-            var instance = finishedWork.stateNode;
-
-            if (instance != null) {
-                // Commit the work prepared earlier.
-                var newProps = finishedWork.memoizedProps; // For hydration we reuse the update path but we treat the oldProps
-                // as the newProps. The updatePayload will contain the real change in
-                // this case.
-
-                var oldProps = current !== null ? current.memoizedProps : newProps;
-                var type = finishedWork.type; // TODO: Type the updateQueue to be specific to host components.
-
-                var updatePayload = finishedWork.updateQueue;
-                finishedWork.updateQueue = null;
-
-                if (updatePayload !== null) {
-                    commitUpdate(instance, updatePayload, type, oldProps, newProps);
-                }
-            }
-
-            return;
-        }
-
-        case HostText: {
-            if (!(finishedWork.stateNode !== null)) {
-                {
-                    throw Error("This should have a text node initialized. This error is likely caused by a bug in React. Please file an issue.");
-                }
-            }
-
-            var textInstance = finishedWork.stateNode;
-            var newText = finishedWork.memoizedProps; // For hydration we reuse the update path but we treat the oldProps
-            // as the newProps. The updatePayload will contain the real change in
-            // this case.
-
-            var oldText = current !== null ? current.memoizedProps : newText;
-            commitTextUpdate(textInstance, oldText, newText);
-            return;
-        }
-
-        case HostRoot: {
-            {
-                var _root = finishedWork.stateNode;
-                if (_root.hydrate) {
-                    // We've just hydrated. No need to hydrate again.
-                    _root.hydrate = false;
-                    commitHydratedContainer(_root.containerInfo);
-                }
-            }
-
-            return;
-        }
-
-        case Profiler: {
-            return;
-        }
-
-        case SuspenseComponent: {
-            // commitSuspenseComponent(finishedWork);
-            // attachSuspenseRetryListeners(finishedWork);
-            return;
-        }
-
-        case SuspenseListComponent: {
-            // attachSuspenseRetryListeners(finishedWork);
-            return;
-        }
-
-        case IncompleteClassComponent: {
-            return;
-        }
-    }
-}
-
-//提交突变效应
-function commitMutationEffects(root, renderPriorityLevel) {
-    // 在这之前，root的数据结构关系，已经迭代完成
-    //
-    while (nextEffect !== null) {
-
-        var effectTag = nextEffect.effectTag;
-
-        //如果有文字节点，则将value 置为''
-        if (effectTag & ContentReset) {
-            commitResetTextContent(nextEffect);
-        }
-        //将 ref 的指向置为 null
-        if (effectTag & Ref) {
-            var current = nextEffect.alternate;
-
-            if (current !== null) {
-                commitDetachRef(current);
-            }
-        } // The following switch statement is only concerned about placement,
-        // updates, and deletions. To avoid needing to add a case for every possible
-        // bitmap value, we remove the secondary effects from the effect tag and
-        // switch on that value.
-
-
-        //以下情况是针对 替换(Placement)、更新(Update)和 删除(Deletion) 的 effectTag 的
-        var primaryEffectTag = effectTag & (Placement | Update | Deletion | Hydrating);
-
-        switch (primaryEffectTag) {
-            //插入新节点
-            case Placement: {
-                //针对该节点及子节点进行插入操作
-                commitPlacement(nextEffect); // Clear the "placement" from effect tag so that we know that this is
-                // inserted, before any life-cycles like componentDidMount gets called.
-                // TODO: findDOMNode doesn't rely on this any more but isMounted does
-                // and isMounted is deprecated anyway so we should be able to kill this.
-
-                nextEffect.effectTag &= ~Placement;
-                break;
-            }
-
-            case PlacementAndUpdate: {
-                //针对该节点及子节点进行插入操作
-                // Placement
-                commitPlacement(nextEffect); // Clear the "placement" from effect tag so that we know that this is
-                // inserted, before any life-cycles like componentDidMount gets called.
-
-                nextEffect.effectTag &= ~Placement; // Update
-
-                var _current = nextEffect.alternate;
-                //对 DOM 节点上的属性进行更新
-                //对 DOM 节点上的属性进行更新
-                commitWork(_current, nextEffect);
-                break;
-            }
-
-            case Hydrating: {
-                nextEffect.effectTag &= ~Hydrating;
-                break;
-            }
-
-            case HydratingAndUpdate: {
-                nextEffect.effectTag &= ~Hydrating; // Update
-
-                var _current2 = nextEffect.alternate;
-                commitWork(_current2, nextEffect);
-                break;
-            }
-            //更新节点
-            //旧节点->新节点
-            case Update: {
-                var _current3 = nextEffect.alternate;
-                commitWork(_current3, nextEffect);
-                break;
-            }
-
-            case Deletion: {
-                //删除节点
-                commitDeletion(root, nextEffect, renderPriorityLevel);
-                break;
-            }
-        } // TODO: Only record a mutation effect if primaryEffectTag is non-zero.
-
-
-        //recordEffect();
-        //resetCurrentFiber();
-        nextEffect = nextEffect.nextEffect;
-    }
-}
-
-function commitMount(domElement, type, newProps, internalInstanceHandle) {
-    // Despite the naming that might imply otherwise, this method only
-    // fires if there is an `Update` effect scheduled during mounting.
-    // This happens if `finalizeInitialChildren` returns `true` (which it
-    // does to implement the `autoFocus` attribute on the client). But
-    // there are also other cases when this might happen (such as patching
-    // up text content during hydration mismatch). So we'll check this again.
-    if (shouldAutoFocusHostComponent(type, newProps)) {
-        domElement.focus();
-    }
-}
-
-function commitLifeCycles(finishedRoot, current, finishedWork, committedExpirationTime) {
-    switch (finishedWork.tag) {
-        /*  case FunctionComponent:
-         case ForwardRef:
-         case SimpleMemoComponent:
-         case Block: {
-           // At this point layout effects have already been destroyed (during mutation phase).
-           // This is done to prevent sibling component effects from interfering with each other,
-           // e.g. a destroy function in one component should never override a ref set
-           // by a create function in another component during the same commit.
-           // commitHookEffectListMount(Layout | HasEffect, finishedWork);
-
-           return;
-         } */
-
-        case ClassComponent: {
-            var instance = finishedWork.stateNode;
-
-            if (finishedWork.effectTag & Update) {
-                if (current === null) {
-                    instance.componentDidMount();
-                } else {
-                    var prevProps = finishedWork.elementType === finishedWork.type ? current.memoizedProps : resolveDefaultProps(finishedWork.type, current.memoizedProps);
-                    var prevState = current.memoizedState;
-                    instance.componentDidUpdate(prevProps, prevState, instance.__reactInternalSnapshotBeforeUpdate);
-                }
-            }
-
-            var updateQueue = finishedWork.updateQueue;
-
-            if (updateQueue !== null) {
-
-                commitUpdateQueue(finishedWork, updateQueue, instance);
-            }
-
-            return;
-        }
-
-        case HostRoot: {
-            var _updateQueue = finishedWork.updateQueue;
-
-            if (_updateQueue !== null) {
-                var _instance = null;
-
-                if (finishedWork.child !== null) {
-                    switch (finishedWork.child.tag) {
-                        case HostComponent:
-                            _instance = getPublicInstance(finishedWork.child.stateNode);
-                            break;
-
-                        case ClassComponent:
-                            _instance = finishedWork.child.stateNode;
-                            break;
-                    }
-                }
-
-                commitUpdateQueue(finishedWork, _updateQueue, _instance);
-            }
-
-            return;
-        }
-
-        case HostComponent: {
-            var _instance2 = finishedWork.stateNode; // Renderers may schedule work to be done after host components are mounted
-            // (eg DOM renderer may schedule auto-focus for inputs and form controls).
-            // These effects should only be committed when components are first mounted,
-            // aka when there is no current/alternate.
-
-            if (current === null && finishedWork.effectTag & Update) {
-                var type = finishedWork.type;
-                var props = finishedWork.memoizedProps;
-                commitMount(_instance2, type, props);
-            }
-
-            return;
-        }
-
-        case HostText: {
-            // We have no life-cycles associated with text.
-            return;
-        }
-    }
-}
-
-function commitAttachRef(finishedWork) {
-    var ref = finishedWork.ref;
-
-    if (ref !== null) {
-        var instance = finishedWork.stateNode;
-        var instanceToUse = instance;
-
-        if (typeof ref === 'function') {
-            ref(instanceToUse);
-        } else {
-            ref.current = instanceToUse;
-        }
-    }
-}
-
-function commitLayoutEffects(root, committedExpirationTime) {
-    //debugger
-    // TODO: Should probably move the bulk of this function to commitWork.
-    while (nextEffect !== null) {
-
-        var effectTag = nextEffect.effectTag;
-
-        if (effectTag & (Update | Callback)) {
-
-            var current = nextEffect.alternate;
-            commitLifeCycles(root, current, nextEffect);
-        }
-
-        if (effectTag & Ref) {
-            //recordEffect();
-            commitAttachRef(nextEffect);
-        }
-
-        nextEffect = nextEffect.nextEffect;
-    }
-}
-
-function commitRootImpl(root, renderPriorityLevel) {
-
-
-    //调度完的任务
-    var finishedWork = root.finishedWork;
-    //调度完的优先级
-    var expirationTime = root.finishedExpirationTime;
-
-
-    //表示该节点没有要更新的任务，直接 return
-    if (finishedWork === null) {
+    //comit提交fier树的变化
+    function commitRoot(root) {
+        commitRootImpl(root, renderPriorityLevel = null);
+
+        return null;
+        //本版本还不需要用到调度。级别什么的暂时不管
+
+        //https://mp.weixin.qq.com/s?__biz=MzU1MDg1NTQ5NQ==&mid=2247484630&idx=1&sn=89a58e3eee0a37a53d2be14215a2276c&chksm=fb9b72feccecfbe8ec62eb2bd2beb85bbf97559d705ddd53d00e0d08d1a5c2391cca722fea3a&scene=21#wechat_redirect
+        //渲染优先级
+        //ImmediatePriority，优先级为 99，最高优先级，立即执行
+        //bind函数，请看：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Function/bind
+        //获取调度优先级，并临时替换当前的优先级，去执行传进来的 callback
+        var renderPriorityLevel = getCurrentPriorityLevel();
+        //获取调度优先级，并临时替换当前的优先级，去执行传进来的 callback
+        //由于ImmediatePriority是最高等级的优先级，所以会立即执行commitRootImpl()方法
+        runWithPriority$1(ImmediatePriority, commitRootImpl.bind(null, root, renderPriorityLevel));
         return null;
     }
 
-    //赋值给变量 finishedWork、expirationTime 后重置成初始值
-    //因为下面在对finishedWork、expirationTime 进行 commit后，任务就完成了
-    root.finishedWork = null;
-    root.finishedExpirationTime = NoWork;
+    function commitRootImpl(root, renderPriorityLevel) {
 
-    //获取 effect 链
+        //分析完成的fiber树
+        var finishedWork = root.finishedWork;
+        //root.finishedWork就是root.current.alternate;就是fiber坑位后面的刚分析好的fiber树，还没提交
 
-    var firstEffect;
+        var expirationTime = root.finishedExpirationTime;
 
-    //如果RootFiber 的 effectTag 有值的话，也就是说RootFiber也要commit的话
-    //将它的 finishedWork 也插入到 effect 链上，放到effect 链的最后 lastEffect.nextEffect 上
-    if (finishedWork.effectTag > PerformedWork) {
-        // A fiber's effect list consists only of its children, not itself. So if
-        // the root has an effect, we need to add it to the end of the list. The
-        // resulting list is the set that would belong to the root's parent, if it
-        // had one; that is, all the effects in the tree including the root.
-        if (finishedWork.lastEffect !== null) {
-            finishedWork.lastEffect.nextEffect = finishedWork;
-            firstEffect = finishedWork.firstEffect;
-        } else {
-            firstEffect = finishedWork;
+        //表示该节点没有要更新的任务，直接return
+        if (finishedWork === null) {
+            return null;
         }
-    } else {
-        // There is no effect on the root.
-        firstEffect = finishedWork.firstEffect;
+
+        //重置
+        //赋值给变量 finishedWork、expirationTime 后重置成初始值
+        //因为下面在对finishedWork、expirationTime 进行 commit后，任务就完成了
+        root.finishedWork = null;
+        root.finishedExpirationTime = NoWork;
+
+        //获取 effect 链
+        //根据effect链，来渲染dom的变化情况
+
+        var firstEffect;
+
+        //如果RootFiber 的 effectTag 有值的话，也就是说RootFiber也要commit的话
+        //将它的 finishedWork 也插入到 effect 链上，放到effect 链的最后 lastEffect.nextEffect 上
+
+
+        //createWorkInProgress(current, pendingProps) 函数在生成针对hostTag的workInProgress时，赋值workInProgress.effectTag=noEfect
+        //后面没看到哪里修改了针对HostTag的workInProgress.effect属性
+
+        debugger
+        if (finishedWork.effectTag > PerformedWork) {
+            //第一次render不走这里，不知道什么用处，暂时不管
+
+            if (finishedWork.lastEffect !== null) {
+                finishedWork.lastEffect.nextEffect = finishedWork;
+                firstEffect = finishedWork.firstEffect;
+            } else {
+                firstEffect = finishedWork;
+            }
+
+        } else {
+
+            firstEffect = finishedWork.firstEffect;
+        }
+
+        //根据effect链条，开始commit
+        //commit分为三个阶段， commit即将开始，commit，commit后
+        //对应commitBeforeMutationEffects，commitMutationEffects，commitLayoutEffects
+
+        if (firstEffect !== null) {
+
+            //标记开始进行「before mutation」子阶段了
+            //更新当前选中的DOM节点，一般为 document.activeElement || document.body
+
+            nextEffect = firstEffect;
+            //
+            do {
+                //调用的回调
+                //调用classComponent 上的生命周期方法 getSnapshotBeforeUpdate
+                //fiber的dom变化情况已经分析完毕，在commit到真实的dom之前，如果class组件有getSnapshotBeforeUpdate函数，
+                //调用该函数，getSnapshotBeforeUpdate的返回值将做为componentDidUpdate的第三个参数
+                //很少使用，主要用来获取dom的信息，如滚动条等
+                //invokeGuardedCallback(null, commitBeforeMutationEffects, null);
+                commitBeforeMutationEffects() //针对class组件，对组件的getSnapshotBeforeUpdate什么周期，进行处理、调用
+            } while (nextEffect !== null);
+            //
+
+            nextEffect = firstEffect;
+            //在这之前已经把root的内部html树结构迭代完成了 firstEffect的child的statenode就是
+            do {
+                {
+                    //关键点
+                    //提交HostComponent的 side effect，也就是真实DOM节点的操作(增删改)
+
+                    // invokeGuardedCallback(null, commitMutationEffects, null, root, renderPriorityLevel);
+                    commitMutationEffects()
+
+
+                }
+            } while (nextEffect !== null);
+
+            // The work-in-progress tree is now the current tree. This must come after
+            // the mutation phase, so that the previous tree is still current during
+            // componentWillUnmount, but before the layout phase, so that the finished
+            // work is current during componentDidMount/Update.
+
+            root.current = finishedWork; // The next phase is the layout phase, where we call effects that read
+            // the host tree after it's been mutated. The idiomatic use case for this is
+            // layout, but class component lifecycles also fire here for legacy reasons.
+            nextEffect = firstEffect;
+
+            do {
+                {
+                    //调用保护回调
+                    //invokeGuardedCallback(null, commitLayoutEffects, null, root, expirationTime);
+                    commitLayoutEffects()
+
+
+                }
+            } while (nextEffect !== null);
+
+            nextEffect = null; // Tell Scheduler to yield at the end of the frame, so the browser has an
+            // opportunity to paint.
+        } else {
+            // No effects.
+            console.log("一般不进入这里的,怎么了！！！！！！")
+        }
+        return null;
     }
 
-    //effect链上第一个需要更新的 fiber 对象
-    if (firstEffect !== null) {
 
-        // The commit phase is broken into several sub-phases. We do a separate pass
-        // of the effect list for each phase: all mutation effects come before all
-        // layout effects, and so on.
-        // 提交阶段分为几个子阶段。我们对每个阶段的效果列表进行单独的遍历:所有的mutation(突变)效果都在所有的layout效果之前
+    //↓↓↓↓↓↓--------commitBeforeMutationEffects---------↓↓↓↓↓↓
+    {
+        //针对class组件，对组件的getSnapshotBeforeUpdate什么周期，进行处理、调用
+        function commitBeforeMutationEffects() {
+            while (nextEffect !== null) {
+                var effectTag = nextEffect.effectTag;
+                if ((effectTag & Snapshot) !== NoEffect) {
+                    var current = nextEffect.alternate;
+                    //针对class组件，对组件的getSnapshotBeforeUpdate什么周期，进行参数传递
+                    commitBeforeMutationLifeCycles(current, nextEffect);
+                }
 
-        // The first phase a "before mutation" phase. We use this phase to read the
-        // state of the host tree right before we mutate it. This is where
-        // getSnapshotBeforeUpdate is called.
-        //标记开始进行「before mutation」子阶段了
+                if ((effectTag & Passive) !== NoEffect) {
+                    // If there are passive effects, schedule a callback to flush at
+                    // the earliest opportunity.
+                    /*
+                    感觉是：getSnapshotBeforeUpdate函数有副作用时，去改变副作用
+                    
+                    if (!rootDoesHavePassiveEffects) {
+                          rootDoesHavePassiveEffects = true;
+                          scheduleCallback(NormalPriority, function () {
+                              flushPassiveEffects();
+                              return null;
+                          });
+                      }   
+                    */
 
-        //更新当前选中的DOM节点，一般为 document.activeElement || document.body
+                }
 
-        nextEffect = firstEffect;
-        //
-        do {
-            //调用的回调
-            //调用 classComponent 上的生命周期方法 getSnapshotBeforeUpdate
-
-            //fiber的dom变化情况已经分析完毕，在commit到真实的dom之前，如果class组件有getSnapshotBeforeUpdate函数，
-            //调用该函数，getSnapshotBeforeUpdate的返回值将做为componentDidUpdate的第三个参数
-            //很少使用，主要用来获取dom的信息，如滚动条等
-            //invokeGuardedCallback(null, commitBeforeMutationEffects, null);
-            commitBeforeMutationEffects()
-
-
-        } while (nextEffect !== null);
-        //
-
-        nextEffect = firstEffect;
-        //在这之前已经把root的内部html树结构迭代完成了 firstEffect的child的statenode就是
-        console.log("---22656")
-        console.log(nextEffect)
-
-        do {
-            {
-                //关键点
-                //提交HostComponent的 side effect，也就是真实DOM节点的操作(增删改)
-
-                // invokeGuardedCallback(null, commitMutationEffects, null, root, renderPriorityLevel);
-                commitMutationEffects()
-
+                nextEffect = nextEffect.nextEffect;
 
             }
-        } while (nextEffect !== null);
+        }
 
-        // The work-in-progress tree is now the current tree. This must come after
-        // the mutation phase, so that the previous tree is still current during
-        // componentWillUnmount, but before the layout phase, so that the finished
-        // work is current during componentDidMount/Update.
+        //针对class组件，对组件的getSnapshotBeforeUpdate什么周期，获取到commit渲染前一个状态的props和state
+        function commitBeforeMutationLifeCycles(current, finishedWork) {
+            switch (finishedWork.tag) {
+                case FunctionComponent:
+                case ForwardRef:
+                case SimpleMemoComponent:
+                case Block: {
+                    return;
+                }
+                case ClassComponent: {
+                    if (finishedWork.effectTag & Snapshot) {
+                        if (current !== null) {
+                            var prevProps = current.memoizedProps;
+                            var prevState = current.memoizedState;
 
-        root.current = finishedWork; // The next phase is the layout phase, where we call effects that read
-        // the host tree after it's been mutated. The idiomatic use case for this is
-        // layout, but class component lifecycles also fire here for legacy reasons.
-        nextEffect = firstEffect;
+                            var instance = finishedWork.stateNode; // We could update instance props and state here,
+                            // but instead we rely on them being set during last render.
+                            // TODO: revisit this when we implement resuming.
 
-        do {
-            {
-                //调用保护回调
-                //invokeGuardedCallback(null, commitLayoutEffects, null, root, expirationTime);
-                commitLayoutEffects()
+                            //var snapshot = instance.getSnapshotBeforeUpdate(finishedWork.elementType === finishedWork.type ? prevProps : resolveDefaultProps(finishedWork.type, prevProps), prevState);
+                            //getSnapshotBeforeUpdate什么周期，获取到commit渲染前一个状态的props和state
+                            var snapshot = instance.getSnapshotBeforeUpdate(prevProps, prevState);
 
+                            if (snapshot === undefined) {
+                                console.error("getSnapshotBeforeUpdate必须有返回值");
+                            }
+                            instance.__reactInternalSnapshotBeforeUpdate = snapshot;
+                        }
+                    }
 
+                    return;
+                }
+                case HostRoot:
+                case HostComponent:
+                case HostText:
+                case HostPortal:
+                case IncompleteClassComponent:
+                    // Nothing to do for these component types
+                    return;
             }
-        } while (nextEffect !== null);
-
-        nextEffect = null; // Tell Scheduler to yield at the end of the frame, so the browser has an
-        // opportunity to paint.
-    } else {
-        // No effects.
-        console.log("一般不进入这里的,怎么了！！！！！！")
+        }
     }
-    return null;
+    //↑↑↑↑↑↑--------commitBeforeMutationEffects---------↑↑↑↑↑↑
+
+
+
+    //↓↓↓↓↓↓--------commitMutationEffects---------↓↓↓↓↓↓
+    {
+        //提交突变效应
+        function commitMutationEffects(root, renderPriorityLevel) {
+            // 在这之前，root的数据结构关系，已经迭代完成
+            //
+            while (nextEffect !== null) {
+                debugger
+                var effectTag = nextEffect.effectTag;
+
+                //如果有文字节点，则将value 置为''
+                if (effectTag & ContentReset) {
+                    commitResetTextContent(nextEffect);
+                }
+                //将 ref 的指向置为 null
+                if (effectTag & Ref) {
+                    var current = nextEffect.alternate;
+
+                    if (current !== null) {
+                        commitDetachRef(current);
+                    }
+                } // The following switch statement is only concerned about placement,
+                // updates, and deletions. To avoid needing to add a case for every possible
+                // bitmap value, we remove the secondary effects from the effect tag and
+                // switch on that value.
+
+
+                //以下情况是针对 替换(Placement)、更新(Update)和 删除(Deletion) 的 effectTag 的
+                var primaryEffectTag = effectTag & (Placement | Update | Deletion | Hydrating);
+
+                switch (primaryEffectTag) {
+                    //插入新节点
+                    case Placement: {
+                        //针对该节点及子节点进行插入操作
+                        commitPlacement(nextEffect); // Clear the "placement" from effect tag so that we know that this is
+                        // inserted, before any life-cycles like componentDidMount gets called.
+                        // TODO: findDOMNode doesn't rely on this any more but isMounted does
+                        // and isMounted is deprecated anyway so we should be able to kill this.
+
+                        nextEffect.effectTag &= ~Placement;
+                        break;
+                    }
+
+                    case PlacementAndUpdate: {
+                        //针对该节点及子节点进行插入操作
+                        // Placement
+                        commitPlacement(nextEffect); // Clear the "placement" from effect tag so that we know that this is
+                        // inserted, before any life-cycles like componentDidMount gets called.
+
+                        nextEffect.effectTag &= ~Placement; // Update
+
+                        var _current = nextEffect.alternate;
+                        //对 DOM 节点上的属性进行更新
+                        //对 DOM 节点上的属性进行更新
+                        commitWork(_current, nextEffect);
+                        break;
+                    }
+
+                    case Hydrating: {
+                        nextEffect.effectTag &= ~Hydrating;
+                        break;
+                    }
+
+                    case HydratingAndUpdate: {
+                        nextEffect.effectTag &= ~Hydrating; // Update
+
+                        var _current2 = nextEffect.alternate;
+                        commitWork(_current2, nextEffect);
+                        break;
+                    }
+                    //更新节点
+                    //旧节点->新节点
+                    case Update: {
+                        var _current3 = nextEffect.alternate;
+                        commitWork(_current3, nextEffect);
+                        break;
+                    }
+
+                    case Deletion: {
+                        //删除节点
+                        commitDeletion(root, nextEffect, renderPriorityLevel);
+                        break;
+                    }
+                } // TODO: Only record a mutation effect if primaryEffectTag is non-zero.
+
+
+                //recordEffect();
+                //resetCurrentFiber();
+                nextEffect = nextEffect.nextEffect;
+            }
+        }
+
+
+
+
+        function commitPlacement(finishedWork) {
+
+            console.log(finishedWork)
+
+            //向上查找，返回是 DOM 元素的父节点(如果不是dom元素，如是class元素就不是dom，继续网上找。HostComponent，HostRoot可以)
+            var parentFiber = getHostParentFiber(finishedWork); // Note: these two variables *must* always be updated together.
+
+            var parent;
+            var isContainer;
+            var parentStateNode = parentFiber.stateNode;
+
+            switch (parentFiber.tag) {
+                //如果是 DOM 元素的话
+                case HostComponent:
+                    //获取对应的 DOM 节点
+                    parent = parentStateNode;
+                    isContainer = false;
+                    break;
+                    //如果是 fiberRoot 节点的话，
+                case HostRoot:
+                    //根节点的存储在containerInfo属性中
+                    //FiberRootNode.containerInfo就是#root 的dom结构
+                    parent = parentStateNode.containerInfo;
+                    isContainer = true;
+                    break;
+
+                case HostPortal:
+                    parent = parentStateNode.containerInfo;
+                    isContainer = true;
+                    break;
+
+                case FundamentalComponent:
+
+                    // eslint-disable-next-line-no-fallthrough
+
+                default: {
+                    {
+                        throw Error("Invalid host parent fiber. This error is likely caused by a bug in React. Please file an issue.");
+                    }
+                }
+
+            }
+            //如果父节点是文本节点的话
+            if (parentFiber.effectTag & ContentReset) {
+                // Reset the text content of the parent before doing any insertions
+                //在进行任何插入操作前，需要先将 value 置为 ''
+                resetTextContent(parent); // Clear ContentReset from the effect tag
+                //再清除掉 ContentReset 这个 effectTag
+                parentFiber.effectTag &= ~ContentReset;
+            }
+            //查找插入节点的位置，也就是获取它后一个 DOM 兄弟节点的位置
+            var before = getHostSibling(finishedWork); // We only have the top Fiber that was inserted but we need to recurse down its
+            // children to find all the terminal nodes.
+            //我们只有插入的Fiber，但需要向下递归
+            //子节点查找所有终端节点。
+
+            console.log(before)
+            if (isContainer) {
+                insertOrAppendPlacementNodeIntoContainer(finishedWork, before, parent);
+            } else {
+                insertOrAppendPlacementNode(finishedWork, before, parent);
+            }
+        }
+
+
+        function insertInContainerBefore(container, child, beforeChild) {
+            if (container.nodeType === COMMENT_NODE) {
+                container.parentNode.insertBefore(child, beforeChild);
+            } else {
+                container.insertBefore(child, beforeChild);
+            }
+        }
+
+        function appendChildToContainer(container, child) {
+
+            var parentNode;
+
+            if (container.nodeType === COMMENT_NODE) {
+                parentNode = container.parentNode;
+                parentNode.insertBefore(child, container);
+            } else {
+                parentNode = container;
+                parentNode.appendChild(child);
+            } // This container might be used for a portal.
+        }
+
+        function insertOrAppendPlacementNodeIntoContainer(node, before, parent) {
+
+            var tag = node.tag;
+            var isHost = tag === HostComponent || tag === HostText;
+
+            if (isHost) {
+                //stateNode是整理好的dom树结构，可以之间insert进dom中
+                var stateNode = isHost ? node.stateNode : node.stateNode.instance;
+
+                if (before) {
+                    insertInContainerBefore(parent, stateNode, before);
+                } else {
+                    appendChildToContainer(parent, stateNode);
+                }
+            } else if (tag === HostPortal) {
+
+            } else {
+                var child = node.child;
+
+                if (child !== null) {
+
+                    insertOrAppendPlacementNodeIntoContainer(child, before, parent);
+                    var sibling = child.sibling;
+                    while (sibling !== null) {
+                        insertOrAppendPlacementNodeIntoContainer(sibling, before, parent);
+                        sibling = sibling.sibling;
+                    }
+                }
+            }
+        }
+
+        function insertOrAppendPlacementNode(node, before, parent) {
+            var tag = node.tag;
+            var isHost = tag === HostComponent || tag === HostText;
+
+            if (isHost || enableFundamentalAPI) {
+                var stateNode = isHost ? node.stateNode : node.stateNode.instance;
+
+                if (before) {
+                    insertBefore(parent, stateNode, before);
+                } else {
+                    appendChild(parent, stateNode);
+                }
+            } else if (tag === HostPortal);
+            else {
+                var child = node.child;
+
+                if (child !== null) {
+                    insertOrAppendPlacementNode(child, before, parent);
+                    var sibling = child.sibling;
+
+                    while (sibling !== null) {
+                        insertOrAppendPlacementNode(sibling, before, parent);
+                        sibling = sibling.sibling;
+                    }
+                }
+            }
+        }
+
+
+
+
+        function commitWork(current, finishedWork) {
+
+            switch (finishedWork.tag) {
+                case FunctionComponent:
+                    //case ForwardRef:
+                    //case MemoComponent:
+                    // case SimpleMemoComponent:
+                    /*  case Block: {
+                      
+                       commitHookEffectListUnmount(Layout | HasEffect, finishedWork);
+                       return;
+                     } */
+
+                case ClassComponent: {
+                    return;
+                }
+
+                case HostComponent: {
+                    var instance = finishedWork.stateNode;
+
+                    if (instance != null) {
+                        // Commit the work prepared earlier.
+                        var newProps = finishedWork.memoizedProps; // For hydration we reuse the update path but we treat the oldProps
+                        // as the newProps. The updatePayload will contain the real change in
+                        // this case.
+
+                        var oldProps = current !== null ? current.memoizedProps : newProps;
+                        var type = finishedWork.type; // TODO: Type the updateQueue to be specific to host components.
+
+                        var updatePayload = finishedWork.updateQueue;
+                        finishedWork.updateQueue = null;
+
+                        if (updatePayload !== null) {
+                            commitUpdate(instance, updatePayload, type, oldProps, newProps);
+                        }
+                    }
+
+                    return;
+                }
+
+                case HostText: {
+                    if (!(finishedWork.stateNode !== null)) {
+                        {
+                            throw Error("This should have a text node initialized. This error is likely caused by a bug in React. Please file an issue.");
+                        }
+                    }
+
+                    var textInstance = finishedWork.stateNode;
+                    var newText = finishedWork.memoizedProps; // For hydration we reuse the update path but we treat the oldProps
+                    // as the newProps. The updatePayload will contain the real change in
+                    // this case.
+
+                    var oldText = current !== null ? current.memoizedProps : newText;
+                    commitTextUpdate(textInstance, oldText, newText);
+                    return;
+                }
+
+                case HostRoot: {
+                    {
+                        var _root = finishedWork.stateNode;
+                        /*  if (_root.hydrate) {
+                             // We've just hydrated. No need to hydrate again.
+                             _root.hydrate = false;
+                             commitHydratedContainer(_root.containerInfo);
+                         } */
+                    }
+
+                    return;
+                }
+
+                case Profiler: {
+                    return;
+                }
+
+                case SuspenseComponent: {
+                    // commitSuspenseComponent(finishedWork);
+                    // attachSuspenseRetryListeners(finishedWork);
+                    return;
+                }
+
+                case SuspenseListComponent: {
+                    // attachSuspenseRetryListeners(finishedWork);
+                    return;
+                }
+
+                case IncompleteClassComponent: {
+                    return;
+                }
+            }
+        }
+
+
+        function commitUpdate(domElement, updatePayload, type, oldProps, newProps, internalInstanceHandle) {
+            // Update the props handle so that we know which props are the ones with
+            // with current event handlers.
+            // Apply the diff to the DOM node.
+
+            domElement.__reactEventHandlers = newProps
+
+            updateProperties(domElement, updatePayload, type, oldProps, newProps);
+        }
+    }
+    //↑↑↑↑↑↑--------commitMutationEffects---------↑↑↑↑↑↑
+
+
+    //↓↓↓↓↓↓--------commitLayoutEffects---------↓↓↓↓↓↓
+    {
+        function commitLayoutEffects(root, committedExpirationTime) {
+            //debugger
+            // TODO: Should probably move the bulk of this function to commitWork.
+            while (nextEffect !== null) {
+
+                var effectTag = nextEffect.effectTag;
+
+                if (effectTag & (Update | Callback)) {
+
+                    var current = nextEffect.alternate;
+                    commitLifeCycles(root, current, nextEffect);
+                }
+
+                if (effectTag & Ref) {
+                    //recordEffect();
+                    commitAttachRef(nextEffect);
+                }
+
+                nextEffect = nextEffect.nextEffect;
+            }
+        }
+
+
+        function commitLifeCycles(finishedRoot, current, finishedWork, committedExpirationTime) {
+            switch (finishedWork.tag) {
+                /*  case FunctionComponent:
+                 case ForwardRef:
+                 case SimpleMemoComponent:
+                 case Block: {
+                   // At this point layout effects have already been destroyed (during mutation phase).
+                   // This is done to prevent sibling component effects from interfering with each other,
+                   // e.g. a destroy function in one component should never override a ref set
+                   // by a create function in another component during the same commit.
+                   // commitHookEffectListMount(Layout | HasEffect, finishedWork);
+        
+                   return;
+                 } */
+
+                case ClassComponent: {
+                    var instance = finishedWork.stateNode;
+
+                    if (finishedWork.effectTag & Update) {
+                        if (current === null) {
+                            instance.componentDidMount();
+                        } else {
+                            var prevProps = finishedWork.elementType === finishedWork.type ? current.memoizedProps : resolveDefaultProps(finishedWork.type, current.memoizedProps);
+                            var prevState = current.memoizedState;
+                            instance.componentDidUpdate(prevProps, prevState, instance.__reactInternalSnapshotBeforeUpdate);
+                        }
+                    }
+
+                    var updateQueue = finishedWork.updateQueue;
+
+                    if (updateQueue !== null) {
+
+                        commitUpdateQueue(finishedWork, updateQueue, instance);
+                    }
+
+                    return;
+                }
+
+                case HostRoot: {
+                    var _updateQueue = finishedWork.updateQueue;
+
+                    if (_updateQueue !== null) {
+                        var _instance = null;
+
+                        if (finishedWork.child !== null) {
+                            switch (finishedWork.child.tag) {
+                                case HostComponent:
+                                    _instance = getPublicInstance(finishedWork.child.stateNode);
+                                    break;
+
+                                case ClassComponent:
+                                    _instance = finishedWork.child.stateNode;
+                                    break;
+                            }
+                        }
+
+                        commitUpdateQueue(finishedWork, _updateQueue, _instance);
+                    }
+
+                    return;
+                }
+
+                case HostComponent: {
+                    var _instance2 = finishedWork.stateNode; // Renderers may schedule work to be done after host components are mounted
+                    // (eg DOM renderer may schedule auto-focus for inputs and form controls).
+                    // These effects should only be committed when components are first mounted,
+                    // aka when there is no current/alternate.
+
+                    if (current === null && finishedWork.effectTag & Update) {
+                        var type = finishedWork.type;
+                        var props = finishedWork.memoizedProps;
+                        commitMount(_instance2, type, props);
+                    }
+
+                    return;
+                }
+
+                case HostText: {
+                    // We have no life-cycles associated with text.
+                    return;
+                }
+            }
+        }
+
+        function callCallback(callback, context) {
+            if (!(typeof callback === 'function')) {
+                {
+                    throw Error("Invalid argument passed as callback. Expected a function. Instead received: " + callback);
+                }
+            }
+
+            callback.call(context);
+        }
+
+        function commitUpdateQueue(finishedWork, finishedQueue, instance) {
+            // Commit the effects
+            var effects = finishedQueue.effects;
+            finishedQueue.effects = null;
+
+            if (effects !== null) {
+                for (var i = 0; i < effects.length; i++) {
+                    var effect = effects[i];
+                    var callback = effect.callback;
+
+                    if (callback !== null) {
+                        effect.callback = null;
+                        callCallback(callback, instance);
+                    }
+                }
+            }
+        }
+
+        function commitMount(domElement, type, newProps, internalInstanceHandle) {
+            // Despite the naming that might imply otherwise, this method only
+            // fires if there is an `Update` effect scheduled during mounting.
+            // This happens if `finalizeInitialChildren` returns `true` (which it
+            // does to implement the `autoFocus` attribute on the client). But
+            // there are also other cases when this might happen (such as patching
+            // up text content during hydration mismatch). So we'll check this again.
+            if (shouldAutoFocusHostComponent(type, newProps)) {
+                domElement.focus();
+            }
+        }
+
+        function commitAttachRef(finishedWork) {
+            var ref = finishedWork.ref;
+
+            if (ref !== null) {
+                var instance = finishedWork.stateNode;
+                var instanceToUse = instance;
+
+                if (typeof ref === 'function') {
+                    ref(instanceToUse);
+                } else {
+                    ref.current = instanceToUse;
+                }
+            }
+        }
+
+    }
+
+    //↑↑↑↑↑↑--------commitLayoutEffects---------↑↑↑↑↑↑
+
 }
-
-
-//↓↓↓↓↓↓--------***---------↓↓↓↓↓↓
-
-//↑↑↑↑↑↑--------***---------↑↑↑↑↑↑
-
-
+//↑↑↑↑↑↑--------finishSyncRender---------↑↑↑↑↑↑
 
 
 //↓↓↓↓↓↓--------completeUnitOfWork---------↓↓↓↓↓↓
 {
 
-
     /**
      * 
      * 
      * 在beginwork执行后，workInProgress的child节点为null时，执行completeUnitOfWork程序。
+     * 
+     * completeWork
      * completeUnitOfWork从叶子节点开始，回溯到根目录。
      * 1，将当前workInProgress的fiber节点DOM化。及使用createElement生成元素，并添加进入当前fiber节点的stateNode中。
      * 重复遍历的节点并不会重复渲染，而是为了取到下一个可能需要渲染的节点。
@@ -1680,7 +1667,12 @@ function commitRootImpl(root, renderPriorityLevel) {
      * 4，返回当前workInProgress的父亲节点。继续执行1，
      * 执行过程：
      * 
-     * completeUnitOfWork在执行时，将计算结果存储在fiber节点的alternate属性中，
+     * 
+     * effect链
+     * 按照深度优先，广度落后的权重原则，构建 effect 链，供 commitRoot 提交阶段使用
+     * 
+     * 
+     * 
      * 
      */
 
@@ -1701,6 +1693,7 @@ function commitRootImpl(root, renderPriorityLevel) {
             var current = workInProgress.alternate;
             var returnFiber = workInProgress.return;
             var next = void 0;
+            //完成当前fiber结点的dom化操作
             //在我这里，next一定是null
             //生成结点，并把后面的dom信息挂在自己的的dom上
             next = completeWork(current, workInProgress, renderExpirationTime = null)
@@ -1713,15 +1706,68 @@ function commitRootImpl(root, renderPriorityLevel) {
             } 
             */
 
-
             // 构建 effect 链，供 commitRoot 提交阶段使用
+            /*            
+                针对一个fiber节点， 构造effect链条。
+                1， 首先将自己的effect链条， 挂在父节点的effect链条的后面（ 如果父节点没有链条， 相当于， 自己的effect链条会是父节点最前面的链条）
+                2， 如果fiber节点本身有副作用， 即fiber.effectTag > PerformedWork。 那么， 将自己挂到父节点的effect链条的最后面面
+                3， 如果当前节点还有有弟弟节点， 继续completeWork， 然后执行1、 2、 3
+                4， 返回当前节点的父节点， 继续这个分析。
+
+                最先挂在的出现在effect链条的最前面
+                深度优先，广度落后。即，层次更深的节点一定再更前面（不考虑广度）。兄节点一定比弟节点更前面（这是广度）。
+           
+
+            
+            对于下面这种dom结构，假设全部发生effect变化
+            render() {
+                return (
+                    <div index={"链条6"}>
+                        <div index={"链条5"}>
+                            <div index={"链条3"}>
+                                <div index={"链条1"} >1</div>
+                                <div index={"链条2"} >2</div>
+                            </div>
+                            <div index={"链条4"} />
+                        </div>
+                    </div>
+                )
+            }
+            它的effect链条将是，链条1->链条2->链条3->链条4->链条5->链条6
+            排序权重：深度优先，广度落后。
+            权重最高的在最前面。
+            */
+
+
+            /* 
+            第一次render时，除了fiberHost节点其他都不追加副作用，副作用主要用来Diff操作的
+
+            第一次render时 除去fiber树的第一个节点,其他节点为 current指fiber.alternate，一定为null
+            if (current === null) {
+                不应该跟踪副作用 ，shouldTrackSideEffects都为false，
+                workInProgress.child = mountChildFibers(workInProgress, null, nextChildren, renderExpirationTime);
+            } else {
+                setstate 或forceUpdate时，fiber树的第一个节点即fiberHost节点
+                跟踪副作用 ，shouldTrackSideEffects都为true，
+                workInProgress.child = reconcileChildFibers(workInProgress, current.child, nextChildren, renderExpirationTime);
+            }
+            */
+
             if (returnFiber !== null && // Do not append effects to parents if a sibling failed to complete
                 (returnFiber.effectTag & Incomplete) === NoEffect) {
+                //   NoEffect为0
+                // (returnFiber.effectTag & Incomplete) === NoEffect 一般都是成立的。
+                //只有在returnFiber.effectTag也是Incomplete时，即fiber还没有完成时，还不会成立。
+
                 // Append all the effects of the subtree and this fiber onto the effect
                 // list of the parent. The completion order of the children affects the
                 // side-effect order.
 
-                // 把自己身上的effect链粘在父节点的effect后面
+                //把自己身上的挂载的effect链粘在父节点的effect链条后面
+                //通过firstEffect，nextEffect，lastEffect，将当前节点和父节点的effect链条链接在一起
+                //将自己的effect链条粘链在effect链条的后面。
+                //距离根节点越近fiber的effect，在链条上越靠前。
+
                 if (returnFiber.firstEffect === null) {
                     returnFiber.firstEffect = workInProgress.firstEffect;
                 }
@@ -1746,20 +1792,16 @@ function commitRootImpl(root, renderPriorityLevel) {
                 // list. PerformedWork effect is read by React DevTools but shouldn't be
                 // committed.
 
-                // 发现自己本身也有effect ， 那么要把自己也加入父节点的effect链上
+                // 如果自己本身也有effect ，那么要把自己也加入父节点的effect链上，在effect链条的最后面
                 if (effectTag > PerformedWork) {
                     if (returnFiber.lastEffect !== null) {
                         returnFiber.lastEffect.nextEffect = workInProgress;
                     } else {
                         returnFiber.firstEffect = workInProgress;
                     }
-
                     returnFiber.lastEffect = workInProgress;
                 }
             }
-
-
-
 
             var siblingFiber = workInProgress.sibling;
             // 有兄弟节点返回兄弟节点，继续走beinWork
@@ -1808,7 +1850,7 @@ function commitRootImpl(root, renderPriorityLevel) {
 
                     //创建元素 -createElement
                     var instance = createInstance(type, newProps, rootContainerInstance, currentHostContext = null, workInProgress);
-                    
+
                     //2, 查询自己的孙元素，曾孙元素等，若找到了DOM化的结构，鉴插入自己（parent）的DOM结构中
                     //appendAllChildren查阅当前fiber节点的子元素，如果子元素不是原生标签而是Class组件等，查看他的孙元素。最终将后辈dom化的元素树追加进入自己的DOM结构中。
                     appendAllChildren(instance, workInProgress, false, false);
@@ -1819,6 +1861,7 @@ function commitRootImpl(root, renderPriorityLevel) {
 
                     //对 DomElement 的属性进行初始化，而<code>节点的文字内容、样式、class、事件 Handler等等也是这个时候存放进去的。
                     if (finalizeInitialChildren(instance, type, newProps, rootContainerInstance)) {
+                        //标记更新副作用
                         markUpdate(workInProgress);
                     }
                 }
@@ -1834,6 +1877,7 @@ function commitRootImpl(root, renderPriorityLevel) {
                     // If we have an alternate, that means this is an update and we need
                     // to schedule a side-effect to do the updates.
                     if (oldText !== newText) {
+                        //标记更新副作用
                         markUpdate(workInProgress);
                     }
                 }
@@ -1932,6 +1976,48 @@ function commitRootImpl(root, renderPriorityLevel) {
     }
     // Calculate the diff between the two objects.
 
+    function setInitialDOMProperties(tag, domElement, rootContainerElement, nextProps, isCustomComponentTag) {
+        for (var propKey in nextProps) {
+            if (!nextProps.hasOwnProperty(propKey)) {
+                continue;
+            }
+            var nextProp = nextProps[propKey];
+            if (propKey === "style") {
+                {
+                    if (nextProp) {
+                        // Freeze the next style object so that we can assume it won't be
+                        // mutated. We have already warned for this in the past.
+                        Object.freeze(nextProp);
+                    }
+                } // Relies on `updateStylesByID` not mutating `styleUpdates`.
+
+                setValueForStyles(domElement, nextProp);
+            } else if (propKey === "dangerouslySetInnerHTML") {
+                var nextHtml = nextProp ? nextProp[HTML$1] : undefined;
+
+                if (nextHtml != null) {
+                    //setInnerHTML(domElement, nextHtml);
+                    domElement.innerHTML = nextHtml;
+                }
+            } else if (propKey === 'children') {
+                if (typeof nextProp === 'string') {
+                    // Avoid setting initial textContent when the text is empty. In IE11 setting
+                    // textContent on a <textarea> will cause the placeholder to not
+                    // show within the <textarea> until it has been focused and blurred again.
+                    // https://github.com/facebook/react/issues/6731#issuecomment-254874553
+                    var canSetTextContent = tag !== 'textarea' || nextProp !== '';
+
+                    if (canSetTextContent) {
+                        setTextContent(domElement, nextProp);
+                    }
+                } else if (typeof nextProp === 'number') {
+                    setTextContent(domElement, '' + nextProp);
+                }
+            }
+        }
+    }
+
+
     function shouldAutoFocusHostComponent(type, props) {
         switch (type) {
             case 'button':
@@ -1948,13 +2034,12 @@ function commitRootImpl(root, renderPriorityLevel) {
         setInitialProperties(domElement, type, props, rootContainerInstance);
         return shouldAutoFocusHostComponent(type, props);
     }
-
+    //标记更新副作用
     function markUpdate(workInProgress) {
         // Tag the fiber with an update effect. This turns a Placement into
         // a PlacementAndUpdate.
         workInProgress.effectTag |= Update;
     }
-
 }
 //↑↑↑↑↑↑--------completeUnitOfWork---------↑↑↑↑↑↑
 
@@ -1979,8 +2064,8 @@ function commitRootImpl(root, renderPriorityLevel) {
         }
     }
 
-    var reconcileChildFibers = ChildReconciler(true);
-    var mountChildFibers = ChildReconciler(false);
+    var reconcileChildFibers = ChildReconciler(true); //追踪副作用 ,形成 effect链
+    var mountChildFibers = ChildReconciler(false); //不追踪副作用
 
     //分析、调和子元素，依据子元素情况生成fiber节点
     function ChildReconciler(shouldTrackSideEffects) {
@@ -2636,8 +2721,10 @@ function commitRootImpl(root, renderPriorityLevel) {
                  6、最后标记 componentDidMount 生命周期，待到提交阶段更新完 dom 后执行 
                  */
                 mountClassInstance(workInProgress, Component, nextProps, renderExpirationTime);
+            } else if (current === null) {
+                shouldUpdate = resumeMountClassInstance(workInProgress, Component, nextProps, renderExpirationTime);
             } else {
-
+                shouldUpdate = updateClassInstance(current, workInProgress, Component, nextProps, renderExpirationTime);
             }
 
             var nextUnitOfWork = finishClassComponent(current, workInProgress, Component, shouldUpdate, null, renderExpirationTime);
@@ -2691,22 +2778,20 @@ function commitRootImpl(root, renderPriorityLevel) {
             processUpdateQueue(workInProgress, newProps, instance, renderExpirationTime);
             instance.state = workInProgress.memoizedState;
             //return
-
             //下面关于生命周期的暂时不关注
             var getDerivedStateFromProps = ctor.getDerivedStateFromProps;
             //生命周期--getDerivedStateFromProps 用来替代componentWillReceiveProps
             if (typeof getDerivedStateFromProps === 'function') {
                 //先注释生命周期
-                // applyDerivedStateFromProps(workInProgress, ctor, getDerivedStateFromProps, newProps);
+                applyDerivedStateFromProps(workInProgress, ctor, getDerivedStateFromProps, newProps);
                 instance.state = workInProgress.memoizedState;
             } // In order to support react-lifecycles-compat polyfilled components,
             // Unsafe lifecycles should not be invoked for components using the new APIs.
             //判断是否有componentWillMount生命周期并且执行，这个生命周期也可能改变State
             if (typeof ctor.getDerivedStateFromProps !== 'function' && typeof instance.getSnapshotBeforeUpdate !== 'function' && (typeof instance.UNSAFE_componentWillMount === 'function' || typeof instance.componentWillMount === 'function')) {
                 //先注释生命周期
-                //callComponentWillMount(workInProgress, instance); // If we had additional state updates during this life-cycle, let's
+                callComponentWillMount(workInProgress, instance); // If we had additional state updates during this life-cycle, let's
                 // process them now.
-
                 //如果改变了state，就有新的update加入updateQueue了
                 processUpdateQueue(workInProgress, newProps, instance, renderExpirationTime);
                 instance.state = workInProgress.memoizedState;
@@ -2845,13 +2930,15 @@ function commitRootImpl(root, renderPriorityLevel) {
         workInProgress = createWorkInProgress(root.current, null);
     }
 
-    //根据传递的current，即一个fiber结构，创建workInProgres对象。workInProgress对象是对该fiber结构的改造和扩展
-    //如果，依赖的fiber对象的alternate没有值，就创建一个fiber,并赋值
-    //如果，依赖的fiber对象的alternate有值，workInProgress = current.alternate
+    /**
+     *根据传递的current，即一个fiber结构，创建workInProgres对象。workInProgress对象是对该fiber结构的改造和扩展
+     *如果，依赖的fiber对象的alternate没有值，就创建一个fiber,并赋值
+     *如果，依赖的fiber对象的alternate有值，workInProgress = current.alternate
+     *workInProgress就是一个fiber节点，它的effectTag、nextEffect、firstEffect、lastEffect等关于前后节点的操作等一开始都为空。
+     *但是workInProgress会共享它创建所依赖的current节点的状态，如tag，elementType，type，stateNode，child，updateQueue....等状态
+     *workInProgress依赖current创建，所以workInProgress的过去版本就是current
+     */
 
-    //workInProgress就是一个fiber节点，它的effectTag、nextEffect、firstEffect、lastEffect等关于前后节点的操作等一开始都为空。
-    //但是workInProgress会共享它创建所依赖的current节点的状态，如tag，elementType，type，stateNode，child，updateQueue....等状态
-    //workInProgress依赖current创建，所以workInProgress的过去版本就是current
     function createWorkInProgress(current, pendingProps) {
         var workInProgress = current.alternate;
         if (workInProgress === null) {
@@ -3067,3 +3154,206 @@ function commitRootImpl(root, renderPriorityLevel) {
     }
 }
 //↑↑↑↑↑↑--------render主流程---------↑↑↑↑↑↑
+
+
+{
+    //     var classComponentUpdater = {
+    //     isMounted: isMounted,
+    //     enqueueSetState: function (inst, payload, callback) {
+    //         //
+    //         console.log(++xxx_panfeng, "操作了多少次setstate")
+    //         var fiber = get(inst);
+    //         var currentTime = requestCurrentTimeForUpdate();
+    //         var suspenseConfig = requestCurrentSuspenseConfig();
+    //         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
+    //         var update = createUpdate(expirationTime, suspenseConfig);
+    //         update.payload = payload;
+
+    //         if (callback !== undefined && callback !== null) {
+    //             {
+    //                 warnOnInvalidCallback(callback, 'setState');
+    //             }
+
+    //             update.callback = callback;
+    //         }
+
+    //         enqueueUpdate(fiber, update);
+    //         scheduleWork(fiber, expirationTime);
+
+    //         //上面和ReactDOM.render中scheduleRootUpdate非常的相似。其实他们就是同一个更新原理呢
+    //         /*  （1）获取节点对应的fiber对象
+    //            （2）计算currentTime
+    //            （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
+    //            （4）根据（3）expirationTime创建update对象
+    //            （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
+    //            （6）将callback赋值到（4）update.callback
+    //            （7）update入队updateQueue
+    //            （8）进行任务调度 
+    //          */
+    //     },
+    //     enqueueReplaceState: function (inst, payload, callback) {
+    //         var fiber = get(inst);
+    //         var currentTime = requestCurrentTimeForUpdate();
+    //         var suspenseConfig = requestCurrentSuspenseConfig();
+    //         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
+    //         var update = createUpdate(expirationTime, suspenseConfig);
+    //         update.tag = ReplaceState;
+    //         update.payload = payload;
+
+    //         if (callback !== undefined && callback !== null) {
+    //             {
+    //                 warnOnInvalidCallback(callback, 'replaceState');
+    //             }
+
+    //             update.callback = callback;
+    //         }
+
+    //         enqueueUpdate(fiber, update);
+    //         scheduleWork(fiber, expirationTime);
+    //     },
+    //     enqueueForceUpdate: function (inst, callback) {
+    //         var fiber = get(inst);
+    //         var currentTime = requestCurrentTimeForUpdate();
+    //         var suspenseConfig = requestCurrentSuspenseConfig();
+    //         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
+    //         var update = createUpdate(expirationTime, suspenseConfig);
+    //         update.tag = ForceUpdate;
+
+    //         if (callback !== undefined && callback !== null) {
+    //             {
+    //                 warnOnInvalidCallback(callback, 'forceUpdate');
+    //             }
+
+    //             update.callback = callback;
+    //         }
+
+    //         enqueueUpdate(fiber, update);
+    //         scheduleWork(fiber, expirationTime);
+
+    //         /*  （1）获取节点对应的fiber对象
+    //             （2）计算currentTime
+    //             （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
+    //             （4）根据（3）expirationTime创建update对象
+    //             （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
+    //             （6）将callback赋值到（4）update.callback
+    //             （7）update入队updateQueue
+    //             （8）进行任务调度 
+    //           */
+    //     }
+    // };
+}
+
+
+
+function updateClassInstance(current, workInProgress, ctor, newProps, renderExpirationTime) {
+    var instance = workInProgress.stateNode;
+    cloneUpdateQueue(current, workInProgress);
+    var oldProps = workInProgress.memoizedProps;
+    instance.props = workInProgress.type === workInProgress.elementType ? oldProps : resolveDefaultProps(workInProgress.type, oldProps);
+    var oldContext = instance.context;
+    var contextType = ctor.contextType;
+    var nextContext = emptyContextObject;
+
+    if (typeof contextType === 'object' && contextType !== null) {
+        nextContext = readContext(contextType);
+    } else {
+        var nextUnmaskedContext = getUnmaskedContext(workInProgress, ctor, true);
+        nextContext = getMaskedContext(workInProgress, nextUnmaskedContext);
+    }
+
+    var getDerivedStateFromProps = ctor.getDerivedStateFromProps;
+    var hasNewLifecycles = typeof getDerivedStateFromProps === 'function' || typeof instance.getSnapshotBeforeUpdate === 'function'; // Note: During these life-cycles, instance.props/instance.state are what
+    // ever the previously attempted to render - not the "current". However,
+    // during componentDidUpdate we pass the "current" props.
+    // In order to support react-lifecycles-compat polyfilled components,
+    // Unsafe lifecycles should not be invoked for components using the new APIs.
+
+    if (!hasNewLifecycles && (typeof instance.UNSAFE_componentWillReceiveProps === 'function' || typeof instance.componentWillReceiveProps === 'function')) {
+        if (oldProps !== newProps || oldContext !== nextContext) {
+            callComponentWillReceiveProps(workInProgress, instance, newProps, nextContext);
+        }
+    }
+
+    resetHasForceUpdateBeforeProcessing();
+    var oldState = workInProgress.memoizedState;
+    var newState = instance.state = oldState;
+    processUpdateQueue(workInProgress, newProps, instance, renderExpirationTime);
+    newState = workInProgress.memoizedState;
+
+    if (oldProps === newProps && oldState === newState && !hasContextChanged() && !checkHasForceUpdateAfterProcessing()) {
+        // If an update was already in progress, we should schedule an Update
+        // effect even though we're bailing out, so that cWU/cDU are called.
+        if (typeof instance.componentDidUpdate === 'function') {
+            if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+                workInProgress.effectTag |= Update;
+            }
+        }
+
+        if (typeof instance.getSnapshotBeforeUpdate === 'function') {
+            if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+                workInProgress.effectTag |= Snapshot;
+            }
+        }
+
+        return false;
+    }
+
+    if (typeof getDerivedStateFromProps === 'function') {
+        applyDerivedStateFromProps(workInProgress, ctor, getDerivedStateFromProps, newProps);
+        newState = workInProgress.memoizedState;
+    }
+
+    var shouldUpdate = checkHasForceUpdateAfterProcessing() || checkShouldComponentUpdate(workInProgress, ctor, oldProps, newProps, oldState, newState, nextContext);
+
+    if (shouldUpdate) {
+        // In order to support react-lifecycles-compat polyfilled components,
+        // Unsafe lifecycles should not be invoked for components using the new APIs.
+        if (!hasNewLifecycles && (typeof instance.UNSAFE_componentWillUpdate === 'function' || typeof instance.componentWillUpdate === 'function')) {
+            startPhaseTimer(workInProgress, 'componentWillUpdate');
+
+            if (typeof instance.componentWillUpdate === 'function') {
+                instance.componentWillUpdate(newProps, newState, nextContext);
+            }
+
+            if (typeof instance.UNSAFE_componentWillUpdate === 'function') {
+                instance.UNSAFE_componentWillUpdate(newProps, newState, nextContext);
+            }
+
+            stopPhaseTimer();
+        }
+
+        if (typeof instance.componentDidUpdate === 'function') {
+            workInProgress.effectTag |= Update;
+        }
+
+        if (typeof instance.getSnapshotBeforeUpdate === 'function') {
+            workInProgress.effectTag |= Snapshot;
+        }
+    } else {
+        // If an update was already in progress, we should schedule an Update
+        // effect even though we're bailing out, so that cWU/cDU are called.
+        if (typeof instance.componentDidUpdate === 'function') {
+            if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+                workInProgress.effectTag |= Update;
+            }
+        }
+
+        if (typeof instance.getSnapshotBeforeUpdate === 'function') {
+            if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+                workInProgress.effectTag |= Snapshot;
+            }
+        } // If shouldComponentUpdate returned false, we should still update the
+        // memoized props/state to indicate that this work can be reused.
+
+
+        workInProgress.memoizedProps = newProps;
+        workInProgress.memoizedState = newState;
+    } // Update the existing instance's state, props, and context pointers even
+    // if shouldComponentUpdate returns false.
+
+
+    instance.props = newProps;
+    instance.state = newState;
+    instance.context = nextContext;
+    return shouldUpdate;
+}

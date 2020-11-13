@@ -37,18 +37,30 @@
                 this.state = { hello: "888888" }
             }
 
-            getSnapshotBeforeUpdate(a) {
-                console.log('--getSnapshotBeforeUpdate--', a)
+            a_getSnapshotBeforeUpdate(a, b) {
+                console.log('-________-getSnapshotBeforeUpdate--', a, b)
+            }
+
+            componentWillMount() {
+                console.log("componentWillMount")
+            }
+            componentDidMount() {
+                console.log("componentDidMount")
             }
 
             render() {
-                return <div style={{ color: "red", fontSize: "20px" }}>
-                    1
-                    <p>{this.state.hello}</p>
-                    <p style={{ color: "orange" }}>hello world</p>
-                    <p>go</p>
-                    <BB />
-                </div>
+                return (
+                    <div index={"链条6"}>
+                        <div index={"链条5"}>
+                            <div index={"链条3"}>
+                                11
+                                <div index={"链条1"} >111</div>
+                                <div index={"链条2"} >2222</div>
+                            </div>
+                            <div index={"链条4"} />
+                        </div>
+                    </div>
+                )
             }
 
         }
@@ -61,6 +73,17 @@
         );
 
 
+
+        var num = 2048
+        console.log("--------")
+        console.log(Number(4096).toString(2))
+        console.log("--------")
+
+
+        console.log(num.toString(2), Number(4).toString(2))
+
+        console.log((num | 4).toString(2))
+        console.log((num & 4).toString(2))
 
 
     </script>
