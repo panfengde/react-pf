@@ -9,6 +9,7 @@
 <div id="root">
     <p>111</p>
 </div>
+<!-- https://projects.wojtekmaj.pl/react-lifecycle-methods-diagram/ -->
 
 <body>
     <script src="./babel.min.js"></script>
@@ -50,13 +51,15 @@
 
             render() {
                 return (
-                    <div index={"链条6"}>
+                    <div index={"链条6"} >
                         <div index={"链条5"}>
                             <div index={"链条3"}>
                                 11
-                                <div index={"链条1"} >111</div>
+                                <div index={"链条1"} style={{ color: "red" }} onClick={() => { alert(1) }}  >111</div>
                                 <div index={"链条2"} >2222</div>
+                                <button onClick={() => { alert(1) }} >click</button>
                             </div>
+                            <BB />
                             <div index={"链条4"} />
                         </div>
                     </div>

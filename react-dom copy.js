@@ -1,3 +1,102 @@
+var prefixedEventNames = {};
+
+var vendorPrefixes = {
+    animationend: makePrefixMap('Animation', 'AnimationEnd'),
+    animationiteration: makePrefixMap('Animation', 'AnimationIteration'),
+    animationstart: makePrefixMap('Animation', 'AnimationStart'),
+    transitionend: makePrefixMap('Transition', 'TransitionEnd')
+};
+
+var DiscreteEvent = 0;
+var eventPriorities = new Map();
+
+function makePrefixMap(styleProp, eventName) {
+    var prefixes = {};
+    prefixes[styleProp.toLowerCase()] = eventName.toLowerCase();
+    prefixes['Webkit' + styleProp] = 'webkit' + eventName;
+    prefixes['Moz' + styleProp] = 'moz' + eventName;
+    return prefixes;
+}
+var TOP_ABORT = unsafeCastStringToDOMTopLevelType('abort');
+var TOP_ANIMATION_END = unsafeCastStringToDOMTopLevelType(getVendorPrefixedEventName('animationend'));
+var TOP_ANIMATION_ITERATION = unsafeCastStringToDOMTopLevelType(getVendorPrefixedEventName('animationiteration'));
+var TOP_ANIMATION_START = unsafeCastStringToDOMTopLevelType(getVendorPrefixedEventName('animationstart'));
+var TOP_BLUR = unsafeCastStringToDOMTopLevelType('blur');
+var TOP_CAN_PLAY = unsafeCastStringToDOMTopLevelType('canplay');
+var TOP_CAN_PLAY_THROUGH = unsafeCastStringToDOMTopLevelType('canplaythrough');
+var TOP_CANCEL = unsafeCastStringToDOMTopLevelType('cancel');
+var TOP_CHANGE = unsafeCastStringToDOMTopLevelType('change');
+var TOP_CLICK = unsafeCastStringToDOMTopLevelType('click');
+var TOP_CLOSE = unsafeCastStringToDOMTopLevelType('close');
+var TOP_COMPOSITION_END = unsafeCastStringToDOMTopLevelType('compositionend');
+var TOP_COMPOSITION_START = unsafeCastStringToDOMTopLevelType('compositionstart');
+var TOP_COMPOSITION_UPDATE = unsafeCastStringToDOMTopLevelType('compositionupdate');
+var TOP_CONTEXT_MENU = unsafeCastStringToDOMTopLevelType('contextmenu');
+var TOP_COPY = unsafeCastStringToDOMTopLevelType('copy');
+var TOP_CUT = unsafeCastStringToDOMTopLevelType('cut');
+var TOP_DOUBLE_CLICK = unsafeCastStringToDOMTopLevelType('dblclick');
+var TOP_AUX_CLICK = unsafeCastStringToDOMTopLevelType('auxclick');
+var TOP_DRAG = unsafeCastStringToDOMTopLevelType('drag');
+var TOP_DRAG_END = unsafeCastStringToDOMTopLevelType('dragend');
+var TOP_DRAG_ENTER = unsafeCastStringToDOMTopLevelType('dragenter');
+var TOP_DRAG_EXIT = unsafeCastStringToDOMTopLevelType('dragexit');
+var TOP_DRAG_LEAVE = unsafeCastStringToDOMTopLevelType('dragleave');
+var TOP_DRAG_OVER = unsafeCastStringToDOMTopLevelType('dragover');
+var TOP_DRAG_START = unsafeCastStringToDOMTopLevelType('dragstart');
+var TOP_DROP = unsafeCastStringToDOMTopLevelType('drop');
+var TOP_DURATION_CHANGE = unsafeCastStringToDOMTopLevelType('durationchange');
+var TOP_EMPTIED = unsafeCastStringToDOMTopLevelType('emptied');
+var TOP_ENCRYPTED = unsafeCastStringToDOMTopLevelType('encrypted');
+var TOP_ENDED = unsafeCastStringToDOMTopLevelType('ended');
+var TOP_ERROR = unsafeCastStringToDOMTopLevelType('error');
+var TOP_FOCUS = unsafeCastStringToDOMTopLevelType('focus');
+var TOP_GOT_POINTER_CAPTURE = unsafeCastStringToDOMTopLevelType('gotpointercapture');
+var TOP_INPUT = unsafeCastStringToDOMTopLevelType('input');
+var TOP_INVALID = unsafeCastStringToDOMTopLevelType('invalid');
+var TOP_KEY_DOWN = unsafeCastStringToDOMTopLevelType('keydown');
+var TOP_KEY_PRESS = unsafeCastStringToDOMTopLevelType('keypress');
+var TOP_KEY_UP = unsafeCastStringToDOMTopLevelType('keyup');
+var TOP_LOAD = unsafeCastStringToDOMTopLevelType('load');
+var TOP_LOAD_START = unsafeCastStringToDOMTopLevelType('loadstart');
+var TOP_LOADED_DATA = unsafeCastStringToDOMTopLevelType('loadeddata');
+var TOP_LOADED_METADATA = unsafeCastStringToDOMTopLevelType('loadedmetadata');
+var TOP_LOST_POINTER_CAPTURE = unsafeCastStringToDOMTopLevelType('lostpointercapture');
+var TOP_MOUSE_DOWN = unsafeCastStringToDOMTopLevelType('mousedown');
+var TOP_MOUSE_MOVE = unsafeCastStringToDOMTopLevelType('mousemove');
+var TOP_MOUSE_OUT = unsafeCastStringToDOMTopLevelType('mouseout');
+var TOP_MOUSE_OVER = unsafeCastStringToDOMTopLevelType('mouseover');
+var TOP_MOUSE_UP = unsafeCastStringToDOMTopLevelType('mouseup');
+var TOP_PASTE = unsafeCastStringToDOMTopLevelType('paste');
+var TOP_PAUSE = unsafeCastStringToDOMTopLevelType('pause');
+var TOP_PLAY = unsafeCastStringToDOMTopLevelType('play');
+var TOP_PLAYING = unsafeCastStringToDOMTopLevelType('playing');
+var TOP_POINTER_CANCEL = unsafeCastStringToDOMTopLevelType('pointercancel');
+var TOP_POINTER_DOWN = unsafeCastStringToDOMTopLevelType('pointerdown');
+var TOP_POINTER_MOVE = unsafeCastStringToDOMTopLevelType('pointermove');
+var TOP_POINTER_OUT = unsafeCastStringToDOMTopLevelType('pointerout');
+var TOP_POINTER_OVER = unsafeCastStringToDOMTopLevelType('pointerover');
+var TOP_POINTER_UP = unsafeCastStringToDOMTopLevelType('pointerup');
+var TOP_PROGRESS = unsafeCastStringToDOMTopLevelType('progress');
+var TOP_RATE_CHANGE = unsafeCastStringToDOMTopLevelType('ratechange');
+var TOP_RESET = unsafeCastStringToDOMTopLevelType('reset');
+var TOP_SCROLL = unsafeCastStringToDOMTopLevelType('scroll');
+var TOP_SEEKED = unsafeCastStringToDOMTopLevelType('seeked');
+var TOP_SEEKING = unsafeCastStringToDOMTopLevelType('seeking');
+var TOP_SELECTION_CHANGE = unsafeCastStringToDOMTopLevelType('selectionchange');
+var TOP_STALLED = unsafeCastStringToDOMTopLevelType('stalled');
+var TOP_SUBMIT = unsafeCastStringToDOMTopLevelType('submit');
+var TOP_SUSPEND = unsafeCastStringToDOMTopLevelType('suspend');
+var TOP_TEXT_INPUT = unsafeCastStringToDOMTopLevelType('textInput');
+var TOP_TIME_UPDATE = unsafeCastStringToDOMTopLevelType('timeupdate');
+var TOP_TOGGLE = unsafeCastStringToDOMTopLevelType('toggle');
+var TOP_TOUCH_CANCEL = unsafeCastStringToDOMTopLevelType('touchcancel');
+var TOP_TOUCH_END = unsafeCastStringToDOMTopLevelType('touchend');
+var TOP_TOUCH_MOVE = unsafeCastStringToDOMTopLevelType('touchmove');
+var TOP_TOUCH_START = unsafeCastStringToDOMTopLevelType('touchstart');
+var TOP_TRANSITION_END = unsafeCastStringToDOMTopLevelType(getVendorPrefixedEventName('transitionend'));
+var TOP_VOLUME_CHANGE = unsafeCastStringToDOMTopLevelType('volumechange');
+var TOP_WAITING = unsafeCastStringToDOMTopLevelType('waiting');
+var TOP_WHEEL = unsafeCastStringToDOMTopLevelType('wheel');
 //↓↓↓↓↓↓--------***---------↓↓↓↓↓↓
 //↑↑↑↑↑↑--------***---------↑↑↑↑↑↑
 
@@ -6,6 +105,8 @@ var workInProgress = null; //工作单元代理变量
 var nextEffect = null;
 var REACT_ELEMENT_TYPE = Symbol.for('react.element')
 
+var registrationNameModules = {};
+var eventPluginOrder = null;
 //↓↓↓↓↓↓--------关于时间的常量---------↓↓↓↓↓↓
 {
     var MAX_SIGNED_31_BIT_INT = 1073741823;
@@ -968,7 +1069,7 @@ var classComponentUpdater = {}
         //createWorkInProgress(current, pendingProps) 函数在生成针对hostTag的workInProgress时，赋值workInProgress.effectTag=noEfect
         //后面没看到哪里修改了针对HostTag的workInProgress.effect属性
 
-        
+
         if (finishedWork.effectTag > PerformedWork) {
             //第一次render不走这里，不知道什么用处，暂时不管
 
@@ -1143,7 +1244,7 @@ var classComponentUpdater = {}
             //（不应该跟踪副作用 ，shouldTrackSideEffects都为false,）
             //只有fiber树的根结点会记录effect
             while (nextEffect !== null) {
-                debugger
+
                 var effectTag = nextEffect.effectTag;
 
                 //如果有文字节点，则将value 置为''
@@ -1168,7 +1269,7 @@ var classComponentUpdater = {}
 
                 switch (primaryEffectTag) {
                     //插入新节点
-                    case Placement: {//2
+                    case Placement: { //2
                         //针对该节点及子节点进行插入操作
                         commitPlacement(nextEffect); // Clear the "placement" from effect tag so that we know that this is
                         // inserted, before any life-cycles like componentDidMount gets called.
@@ -1179,7 +1280,7 @@ var classComponentUpdater = {}
                         break;
                     }
 
-                    case PlacementAndUpdate: {//6
+                    case PlacementAndUpdate: { //6
                         //第一次render
                         //针对该节点及子节点进行插入操作
                         // Placement
@@ -1195,12 +1296,12 @@ var classComponentUpdater = {}
                         break;
                     }
 
-                    case Hydrating: {//1024
+                    case Hydrating: { //1024
                         nextEffect.effectTag &= ~Hydrating;
                         break;
                     }
 
-                    case HydratingAndUpdate: {//1028
+                    case HydratingAndUpdate: { //1028
                         nextEffect.effectTag &= ~Hydrating; // Update
 
                         var _current2 = nextEffect.alternate;
@@ -1209,13 +1310,13 @@ var classComponentUpdater = {}
                     }
                     //更新节点
                     //旧节点->新节点
-                    case Update: {//4
+                    case Update: { //4
                         var _current3 = nextEffect.alternate;
                         commitWork(_current3, nextEffect);
                         break;
                     }
 
-                    case Deletion: {//8
+                    case Deletion: { //8
                         //删除节点
                         commitDeletion(root, nextEffect, renderPriorityLevel);
                         break;
@@ -1333,7 +1434,7 @@ var classComponentUpdater = {}
             if (isHost) {
                 //stateNode是整理好的dom树结构，可以之间insert进dom中
                 // var stateNode = isHost ? node.stateNode : node.stateNode.instance;
-                var stateNode =node.stateNode
+                var stateNode = node.stateNode
 
                 if (before) {
                     insertInContainerBefore(parent, stateNode, before);
@@ -1495,7 +1596,7 @@ var classComponentUpdater = {}
     //↓↓↓↓↓↓--------commitLayoutEffects---------↓↓↓↓↓↓
     {
         function commitLayoutEffects(root, committedExpirationTime) {
-            //debugger
+            //
             // TODO: Should probably move the bulk of this function to commitWork.
             while (nextEffect !== null) {
 
@@ -1980,9 +2081,10 @@ var classComponentUpdater = {}
 
         switch (tag) {
             default:
-            
+
                 break;
         }
+
     }
     // Calculate the diff between the two objects.
 
@@ -2022,6 +2124,16 @@ var classComponentUpdater = {}
                     }
                 } else if (typeof nextProp === 'number') {
                     setTextContent(domElement, '' + nextProp);
+                }
+                //} else if (registrationNameModules.hasOwnProperty(propKey)) {
+            } else if (propKey == "onClick") {
+                debugger
+                if (nextProp != null) {
+                    /* if (typeof nextProp !== 'function') {
+                      warnForInvalidEventListener(propKey, nextProp);
+                    } */
+                    debugger
+                    ensureListeningTo(rootContainerElement, propKey);
                 }
             }
         }
@@ -2563,7 +2675,7 @@ var classComponentUpdater = {}
 
 
     function forceUnmountCurrentAndReconcile(current, workInProgress, nextChildren, renderExpirationTime) {
-        debugger
+
         // This function is fork of reconcileChildren. It's used in cases where we
         // want to reconcile without matching against the existing set. This has the
         // effect of all current children being unmounted; even if the type and key
@@ -3370,3 +3482,1060 @@ function updateClassInstance(current, workInProgress, ctor, newProps, renderExpi
 
 
 
+function noop() {}
+
+function trapClickOnNonInteractiveElement(node) {
+    // Mobile Safari does not fire properly bubble click events on
+    // non-interactive elements, which means delegated click listeners do not
+    // fire. The workaround for this bug involves attaching an empty click
+    // listener on the target node.
+    // http://www.quirksmode.org/blog/archives/2010/09/click_event_del.html
+    // Just set it using the onclick property so that we don't have to manage any
+    // bookkeeping for it. Not sure if we need to clear it when the listener is
+    // removed.
+    // TODO: Only do this for the relevant Safaris maybe?
+    node.onclick = noop;
+}
+
+
+
+//------------------------event
+//------------------------event
+//------------------------event
+//------------------------event
+//------------------------event
+//------------------------event
+//------------------------event
+//------------------------event
+//------------------------event
+//------------------------event
+
+
+function ensureListeningTo(rootContainerElement, registrationName) {
+    var isDocumentOrFragment = rootContainerElement.nodeType === DOCUMENT_NODE || rootContainerElement.nodeType === DOCUMENT_FRAGMENT_NODE;
+    var doc = isDocumentOrFragment ? rootContainerElement : rootContainerElement.ownerDocument;
+    legacyListenToEvent(registrationName, doc);
+}
+
+var registrationNameDependencies = {};
+
+function legacyListenToEvent(registrationName, mountAt) {
+    var listenerMap = getListenerMapForElement(mountAt);
+    debugger
+    var dependencies = registrationNameDependencies[registrationName];
+
+    for (var i = 0; i < dependencies.length; i++) {
+        var dependency = dependencies[i];
+        legacyListenToTopLevelEvent(dependency, mountAt, listenerMap);
+    }
+}
+
+
+
+function legacyListenToTopLevelEvent(topLevelType, mountAt, listenerMap) {
+    if (!listenerMap.has(topLevelType)) {
+        switch (topLevelType) {
+            case TOP_SCROLL:
+                trapCapturedEvent(TOP_SCROLL, mountAt);
+                break;
+
+            case TOP_FOCUS:
+            case TOP_BLUR:
+                trapCapturedEvent(TOP_FOCUS, mountAt);
+                trapCapturedEvent(TOP_BLUR, mountAt); // We set the flag for a single dependency later in this function,
+                // but this ensures we mark both as attached rather than just one.
+
+                listenerMap.set(TOP_BLUR, null);
+                listenerMap.set(TOP_FOCUS, null);
+                break;
+
+            case TOP_CANCEL:
+            case TOP_CLOSE:
+                if (isEventSupported(getRawEventName(topLevelType))) {
+                    trapCapturedEvent(topLevelType, mountAt);
+                }
+
+                break;
+
+            case TOP_INVALID:
+            case TOP_SUBMIT:
+            case TOP_RESET:
+                // We listen to them on the target DOM elements.
+                // Some of them bubble so we don't want them to fire twice.
+                break;
+
+            default:
+                // By default, listen on the top level to all non-media events.
+                // Media events don't bubble so adding the listener wouldn't do anything.
+                var isMediaEvent = mediaEventTypes.indexOf(topLevelType) !== -1;
+
+                if (!isMediaEvent) {
+                    trapBubbledEvent(topLevelType, mountAt);
+                }
+
+                break;
+        }
+
+        listenerMap.set(topLevelType, null);
+    }
+}
+
+
+function trapCapturedEvent(topLevelType, element) {
+    trapEventForPluginEventSystem(element, topLevelType, true);
+}
+
+
+
+
+var PossiblyWeakMap = typeof WeakMap === 'function' ? WeakMap : Map; // prettier-ignore
+
+var elementListenerMap = new PossiblyWeakMap();
+
+function getListenerMapForElement(element) {
+    var listenerMap = elementListenerMap.get(element);
+
+    if (listenerMap === undefined) {
+        listenerMap = new Map();
+        elementListenerMap.set(element, listenerMap);
+    }
+
+    return listenerMap;
+}
+
+
+
+
+
+
+
+
+var discreteEventPairsForSimpleEventPlugin = [TOP_BLUR, 'blur', TOP_CANCEL, 'cancel', TOP_CLICK, 'click', TOP_CLOSE, 'close', TOP_CONTEXT_MENU, 'contextMenu', TOP_COPY, 'copy', TOP_CUT, 'cut', TOP_AUX_CLICK, 'auxClick', TOP_DOUBLE_CLICK, 'doubleClick', TOP_DRAG_END, 'dragEnd', TOP_DRAG_START, 'dragStart', TOP_DROP, 'drop', TOP_FOCUS, 'focus', TOP_INPUT, 'input', TOP_INVALID, 'invalid', TOP_KEY_DOWN, 'keyDown', TOP_KEY_PRESS, 'keyPress', TOP_KEY_UP, 'keyUp', TOP_MOUSE_DOWN, 'mouseDown', TOP_MOUSE_UP, 'mouseUp', TOP_PASTE, 'paste', TOP_PAUSE, 'pause', TOP_PLAY, 'play', TOP_POINTER_CANCEL, 'pointerCancel', TOP_POINTER_DOWN, 'pointerDown', TOP_POINTER_UP, 'pointerUp', TOP_RATE_CHANGE, 'rateChange', TOP_RESET, 'reset', TOP_SEEKED, 'seeked', TOP_SUBMIT, 'submit', TOP_TOUCH_CANCEL, 'touchCancel', TOP_TOUCH_END, 'touchEnd', TOP_TOUCH_START, 'touchStart', TOP_VOLUME_CHANGE, 'volumeChange'];
+var otherDiscreteEvents = [TOP_CHANGE, TOP_SELECTION_CHANGE, TOP_TEXT_INPUT, TOP_COMPOSITION_START, TOP_COMPOSITION_END, TOP_COMPOSITION_UPDATE]; // prettier-ignore
+
+var userBlockingPairsForSimpleEventPlugin = [TOP_DRAG, 'drag', TOP_DRAG_ENTER, 'dragEnter', TOP_DRAG_EXIT, 'dragExit', TOP_DRAG_LEAVE, 'dragLeave', TOP_DRAG_OVER, 'dragOver', TOP_MOUSE_MOVE, 'mouseMove', TOP_MOUSE_OUT, 'mouseOut', TOP_MOUSE_OVER, 'mouseOver', TOP_POINTER_MOVE, 'pointerMove', TOP_POINTER_OUT, 'pointerOut', TOP_POINTER_OVER, 'pointerOver', TOP_SCROLL, 'scroll', TOP_TOGGLE, 'toggle', TOP_TOUCH_MOVE, 'touchMove', TOP_WHEEL, 'wheel']; // prettier-ignore
+
+var continuousPairsForSimpleEventPlugin = [TOP_ABORT, 'abort', TOP_ANIMATION_END, 'animationEnd', TOP_ANIMATION_ITERATION, 'animationIteration', TOP_ANIMATION_START, 'animationStart', TOP_CAN_PLAY, 'canPlay', TOP_CAN_PLAY_THROUGH, 'canPlayThrough', TOP_DURATION_CHANGE, 'durationChange', TOP_EMPTIED, 'emptied', TOP_ENCRYPTED, 'encrypted', TOP_ENDED, 'ended', TOP_ERROR, 'error', TOP_GOT_POINTER_CAPTURE, 'gotPointerCapture', TOP_LOAD, 'load', TOP_LOADED_DATA, 'loadedData', TOP_LOADED_METADATA, 'loadedMetadata', TOP_LOAD_START, 'loadStart', TOP_LOST_POINTER_CAPTURE, 'lostPointerCapture', TOP_PLAYING, 'playing', TOP_PROGRESS, 'progress', TOP_SEEKING, 'seeking', TOP_STALLED, 'stalled', TOP_SUSPEND, 'suspend', TOP_TIME_UPDATE, 'timeUpdate', TOP_TRANSITION_END, 'transitionEnd', TOP_WAITING, 'waiting'];
+
+
+var simpleEventPluginEventTypes = {};
+
+function processSimpleEventPluginPairsByPriority(eventTypes, priority) {
+    // As the event types are in pairs of two, we need to iterate
+    // through in twos. The events are in pairs of two to save code
+    // and improve init perf of processing this array, as it will
+    // result in far fewer object allocations and property accesses
+    // if we only use three arrays to process all the categories of
+    // instead of tuples.
+    for (var i = 0; i < eventTypes.length; i += 2) {
+        var topEvent = eventTypes[i];
+        var event = eventTypes[i + 1];
+        var capitalizedEvent = event[0].toUpperCase() + event.slice(1);
+        var onEvent = 'on' + capitalizedEvent;
+        var config = {
+            phasedRegistrationNames: {
+                bubbled: onEvent,
+                captured: onEvent + 'Capture'
+            },
+            dependencies: [topEvent],
+            eventPriority: priority
+        };
+        eventPriorities.set(topEvent, priority);
+        topLevelEventsToDispatchConfig.set(topEvent, config);
+        simpleEventPluginEventTypes[event] = config;
+    }
+}
+
+
+
+
+processSimpleEventPluginPairsByPriority(discreteEventPairsForSimpleEventPlugin, DiscreteEvent);
+processSimpleEventPluginPairsByPriority(userBlockingPairsForSimpleEventPlugin, UserBlockingEvent);
+processSimpleEventPluginPairsByPriority(continuousPairsForSimpleEventPlugin, ContinuousEvent); // 
+
+var namesToPlugins = {};
+
+var DOMEventPluginOrder = ['ResponderEventPlugin', 'SimpleEventPlugin', 'EnterLeaveEventPlugin', 'ChangeEventPlugin', 'SelectEventPlugin', 'BeforeInputEventPlugin'];
+/**
+ * Inject modules for resolving DOM hierarchy and plugin ordering.
+ */
+
+injectEventPluginOrder(DOMEventPluginOrder);
+
+var SimpleEventPlugin = {
+    // simpleEventPluginEventTypes gets populated from
+    // the DOMEventProperties module.
+    eventTypes: simpleEventPluginEventTypes,
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget, eventSystemFlags) {
+        var dispatchConfig = topLevelEventsToDispatchConfig.get(topLevelType);
+
+        if (!dispatchConfig) {
+            return null;
+        }
+
+        var EventConstructor;
+
+        switch (topLevelType) {
+            case TOP_KEY_PRESS:
+                // Firefox creates a keypress event for function keys too. This removes
+                // the unwanted keypress events. Enter is however both printable and
+                // non-printable. One would expect Tab to be as well (but it isn't).
+                if (getEventCharCode(nativeEvent) === 0) {
+                    return null;
+                }
+
+                /* falls through */
+
+                case TOP_KEY_DOWN:
+                case TOP_KEY_UP:
+                    EventConstructor = SyntheticKeyboardEvent;
+                    break;
+
+                case TOP_BLUR:
+                case TOP_FOCUS:
+                    EventConstructor = SyntheticFocusEvent;
+                    break;
+
+                case TOP_CLICK:
+                    // Firefox creates a click event on right mouse clicks. This removes the
+                    // unwanted click events.
+                    if (nativeEvent.button === 2) {
+                        return null;
+                    }
+
+                    /* falls through */
+
+                    case TOP_AUX_CLICK:
+                    case TOP_DOUBLE_CLICK:
+                    case TOP_MOUSE_DOWN:
+                    case TOP_MOUSE_MOVE:
+                    case TOP_MOUSE_UP: // TODO: Disabled elements should not respond to mouse events
+
+                        /* falls through */
+
+                    case TOP_MOUSE_OUT:
+                    case TOP_MOUSE_OVER:
+                    case TOP_CONTEXT_MENU:
+                        EventConstructor = SyntheticMouseEvent;
+                        break;
+
+                    case TOP_DRAG:
+                    case TOP_DRAG_END:
+                    case TOP_DRAG_ENTER:
+                    case TOP_DRAG_EXIT:
+                    case TOP_DRAG_LEAVE:
+                    case TOP_DRAG_OVER:
+                    case TOP_DRAG_START:
+                    case TOP_DROP:
+                        EventConstructor = SyntheticDragEvent;
+                        break;
+
+                    case TOP_TOUCH_CANCEL:
+                    case TOP_TOUCH_END:
+                    case TOP_TOUCH_MOVE:
+                    case TOP_TOUCH_START:
+                        EventConstructor = SyntheticTouchEvent;
+                        break;
+
+                    case TOP_ANIMATION_END:
+                    case TOP_ANIMATION_ITERATION:
+                    case TOP_ANIMATION_START:
+                        EventConstructor = SyntheticAnimationEvent;
+                        break;
+
+                    case TOP_TRANSITION_END:
+                        EventConstructor = SyntheticTransitionEvent;
+                        break;
+
+                    case TOP_SCROLL:
+                        EventConstructor = SyntheticUIEvent;
+                        break;
+
+                    case TOP_WHEEL:
+                        EventConstructor = SyntheticWheelEvent;
+                        break;
+
+                    case TOP_COPY:
+                    case TOP_CUT:
+                    case TOP_PASTE:
+                        EventConstructor = SyntheticClipboardEvent;
+                        break;
+
+                    case TOP_GOT_POINTER_CAPTURE:
+                    case TOP_LOST_POINTER_CAPTURE:
+                    case TOP_POINTER_CANCEL:
+                    case TOP_POINTER_DOWN:
+                    case TOP_POINTER_MOVE:
+                    case TOP_POINTER_OUT:
+                    case TOP_POINTER_OVER:
+                    case TOP_POINTER_UP:
+                        EventConstructor = SyntheticPointerEvent;
+                        break;
+
+                    default: {
+                        if (knownHTMLTopLevelTypes.indexOf(topLevelType) === -1) {
+                            error('SimpleEventPlugin: Unhandled event type, `%s`. This warning ' + 'is likely caused by a bug in React. Please file an issue.', topLevelType);
+                        }
+                    } // HTML Events
+                    // @see http://www.w3.org/TR/html5/index.html#events-0
+
+
+                    EventConstructor = SyntheticEvent;
+                    break;
+        }
+
+        var event = EventConstructor.getPooled(dispatchConfig, targetInst, nativeEvent, nativeEventTarget);
+        accumulateTwoPhaseDispatches(event);
+        return event;
+    }
+};
+
+var EnterLeaveEventPlugin = {
+    eventTypes: eventTypes$2,
+
+    /**
+     * For almost every interaction we care about, there will be both a top-level
+     * `mouseover` and `mouseout` event that occurs. Only use `mouseout` so that
+     * we do not extract duplicate events. However, moving the mouse into the
+     * browser from outside will not fire a `mouseout` event. In this case, we use
+     * the `mouseover` top-level event.
+     */
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget, eventSystemFlags) {
+        var isOverEvent = topLevelType === TOP_MOUSE_OVER || topLevelType === TOP_POINTER_OVER;
+        var isOutEvent = topLevelType === TOP_MOUSE_OUT || topLevelType === TOP_POINTER_OUT;
+
+        if (isOverEvent && (eventSystemFlags & IS_REPLAYED) === 0 && (nativeEvent.relatedTarget || nativeEvent.fromElement)) {
+            // If this is an over event with a target, then we've already dispatched
+            // the event in the out event of the other target. If this is replayed,
+            // then it's because we couldn't dispatch against this target previously
+            // so we have to do it now instead.
+            return null;
+        }
+
+        if (!isOutEvent && !isOverEvent) {
+            // Must not be a mouse or pointer in or out - ignoring.
+            return null;
+        }
+
+        var win;
+
+        if (nativeEventTarget.window === nativeEventTarget) {
+            // `nativeEventTarget` is probably a window object.
+            win = nativeEventTarget;
+        } else {
+            // TODO: Figure out why `ownerDocument` is sometimes undefined in IE8.
+            var doc = nativeEventTarget.ownerDocument;
+
+            if (doc) {
+                win = doc.defaultView || doc.parentWindow;
+            } else {
+                win = window;
+            }
+        }
+
+        var from;
+        var to;
+
+        if (isOutEvent) {
+            from = targetInst;
+            var related = nativeEvent.relatedTarget || nativeEvent.toElement;
+            to = related ? getClosestInstanceFromNode(related) : null;
+
+            if (to !== null) {
+                var nearestMounted = getNearestMountedFiber(to);
+
+                if (to !== nearestMounted || to.tag !== HostComponent && to.tag !== HostText) {
+                    to = null;
+                }
+            }
+        } else {
+            // Moving to a node from outside the window.
+            from = null;
+            to = targetInst;
+        }
+
+        if (from === to) {
+            // Nothing pertains to our managed components.
+            return null;
+        }
+
+        var eventInterface, leaveEventType, enterEventType, eventTypePrefix;
+
+        if (topLevelType === TOP_MOUSE_OUT || topLevelType === TOP_MOUSE_OVER) {
+            eventInterface = SyntheticMouseEvent;
+            leaveEventType = eventTypes$2.mouseLeave;
+            enterEventType = eventTypes$2.mouseEnter;
+            eventTypePrefix = 'mouse';
+        } else if (topLevelType === TOP_POINTER_OUT || topLevelType === TOP_POINTER_OVER) {
+            eventInterface = SyntheticPointerEvent;
+            leaveEventType = eventTypes$2.pointerLeave;
+            enterEventType = eventTypes$2.pointerEnter;
+            eventTypePrefix = 'pointer';
+        }
+
+        var fromNode = from == null ? win : getNodeFromInstance$1(from);
+        var toNode = to == null ? win : getNodeFromInstance$1(to);
+        var leave = eventInterface.getPooled(leaveEventType, from, nativeEvent, nativeEventTarget);
+        leave.type = eventTypePrefix + 'leave';
+        leave.target = fromNode;
+        leave.relatedTarget = toNode;
+        var enter = eventInterface.getPooled(enterEventType, to, nativeEvent, nativeEventTarget);
+        enter.type = eventTypePrefix + 'enter';
+        enter.target = toNode;
+        enter.relatedTarget = fromNode;
+        accumulateEnterLeaveDispatches(leave, enter, from, to); // If we are not processing the first ancestor, then we
+        // should not process the same nativeEvent again, as we
+        // will have already processed it in the first ancestor.
+
+        if ((eventSystemFlags & IS_FIRST_ANCESTOR) === 0) {
+            return [leave];
+        }
+
+        return [leave, enter];
+    }
+};
+
+var ChangeEventPlugin = {
+    eventTypes: eventTypes$1,
+    _isInputEventSupported: isInputEventSupported,
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget, eventSystemFlags) {
+        var targetNode = targetInst ? getNodeFromInstance$1(targetInst) : window;
+        var getTargetInstFunc, handleEventFunc;
+
+        if (shouldUseChangeEvent(targetNode)) {
+            getTargetInstFunc = getTargetInstForChangeEvent;
+        } else if (isTextInputElement(targetNode)) {
+            if (isInputEventSupported) {
+                getTargetInstFunc = getTargetInstForInputOrChangeEvent;
+            } else {
+                getTargetInstFunc = getTargetInstForInputEventPolyfill;
+                handleEventFunc = handleEventsForInputEventPolyfill;
+            }
+        } else if (shouldUseClickEvent(targetNode)) {
+            getTargetInstFunc = getTargetInstForClickEvent;
+        }
+
+        if (getTargetInstFunc) {
+            var inst = getTargetInstFunc(topLevelType, targetInst);
+
+            if (inst) {
+                var event = createAndAccumulateChangeEvent(inst, nativeEvent, nativeEventTarget);
+                return event;
+            }
+        }
+
+        if (handleEventFunc) {
+            handleEventFunc(topLevelType, targetNode, targetInst);
+        } // When blurring, set the value attribute for number inputs
+
+
+        if (topLevelType === TOP_BLUR) {
+            handleControlledInputBlur(targetNode);
+        }
+    }
+};
+
+var SelectEventPlugin = {
+    eventTypes: eventTypes$3,
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget, eventSystemFlags, container) {
+        var containerOrDoc = container || getEventTargetDocument(nativeEventTarget); // Track whether all listeners exists for this plugin. If none exist, we do
+        // not extract events. See #3639.
+
+        if (!containerOrDoc || !isListeningToAllDependencies('onSelect', containerOrDoc)) {
+            return null;
+        }
+
+        var targetNode = targetInst ? getNodeFromInstance$1(targetInst) : window;
+
+        switch (topLevelType) {
+            // Track the input node that has focus.
+            case TOP_FOCUS:
+                if (isTextInputElement(targetNode) || targetNode.contentEditable === 'true') {
+                    activeElement$1 = targetNode;
+                    activeElementInst$1 = targetInst;
+                    lastSelection = null;
+                }
+
+                break;
+
+            case TOP_BLUR:
+                activeElement$1 = null;
+                activeElementInst$1 = null;
+                lastSelection = null;
+                break;
+                // Don't fire the event while the user is dragging. This matches the
+                // semantics of the native select event.
+
+            case TOP_MOUSE_DOWN:
+                mouseDown = true;
+                break;
+
+            case TOP_CONTEXT_MENU:
+            case TOP_MOUSE_UP:
+            case TOP_DRAG_END:
+                mouseDown = false;
+                return constructSelectEvent(nativeEvent, nativeEventTarget);
+                // Chrome and IE fire non-standard event when selection is changed (and
+                // sometimes when it hasn't). IE's event fires out of order with respect
+                // to key and input events on deletion, so we discard it.
+                //
+                // Firefox doesn't support selectionchange, so check selection status
+                // after each key entry. The selection changes after keydown and before
+                // keyup, but we check on keydown as well in the case of holding down a
+                // key, when multiple keydown events are fired but only one keyup is.
+                // This is also our approach for IE handling, for the reason above.
+
+            case TOP_SELECTION_CHANGE:
+                if (skipSelectionChangeEvent) {
+                    break;
+                }
+
+                // falls through
+
+                case TOP_KEY_DOWN:
+                case TOP_KEY_UP:
+                    return constructSelectEvent(nativeEvent, nativeEventTarget);
+        }
+
+        return null;
+    }
+};
+
+var BeforeInputEventPlugin = {
+    eventTypes: eventTypes,
+    extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget, eventSystemFlags) {
+        var composition = extractCompositionEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget);
+        var beforeInput = extractBeforeInputEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget);
+
+        if (composition === null) {
+            return beforeInput;
+        }
+
+        if (beforeInput === null) {
+            return composition;
+        }
+
+        return [composition, beforeInput];
+    }
+};
+
+
+injectEventPluginsByName({
+    SimpleEventPlugin: SimpleEventPlugin,
+    EnterLeaveEventPlugin: EnterLeaveEventPlugin,
+    ChangeEventPlugin: ChangeEventPlugin,
+    SelectEventPlugin: SelectEventPlugin,
+    BeforeInputEventPlugin: BeforeInputEventPlugin
+});
+
+function injectEventPluginOrder(injectedEventPluginOrder) {
+    eventPluginOrder = Array.prototype.slice.call(injectedEventPluginOrder);
+    recomputePluginOrdering();
+}
+
+
+function injectEventPluginsByName(injectedNamesToPlugins) {
+    var isOrderingDirty = false;
+
+    for (var pluginName in injectedNamesToPlugins) {
+        if (!injectedNamesToPlugins.hasOwnProperty(pluginName)) {
+            continue;
+        }
+
+        var pluginModule = injectedNamesToPlugins[pluginName];
+
+        if (!namesToPlugins.hasOwnProperty(pluginName) || namesToPlugins[pluginName] !== pluginModule) {
+            if (!!namesToPlugins[pluginName]) {
+                {
+                    throw Error("EventPluginRegistry: Cannot inject two different event plugins using the same name, `" + pluginName + "`.");
+                }
+            }
+
+            namesToPlugins[pluginName] = pluginModule;
+            isOrderingDirty = true;
+        }
+    }
+
+    if (isOrderingDirty) {
+        recomputePluginOrdering();
+    }
+}
+
+
+
+
+function recomputePluginOrdering() {
+    if (!eventPluginOrder) {
+        // Wait until an `eventPluginOrder` is injected.
+        return;
+    }
+
+    for (var pluginName in namesToPlugins) {
+        var pluginModule = namesToPlugins[pluginName];
+        var pluginIndex = eventPluginOrder.indexOf(pluginName);
+
+
+        if (plugins[pluginIndex]) {
+            continue;
+        }
+
+
+        plugins[pluginIndex] = pluginModule;
+        var publishedEvents = pluginModule.eventTypes;
+
+        for (var eventName in publishedEvents) {
+            if (!publishEventForPlugin(publishedEvents[eventName], pluginModule, eventName)) {
+                {
+                    throw Error("EventPluginRegistry: Failed to publish event `" + eventName + "` for plugin `" + pluginName + "`.");
+                }
+            }
+        }
+    }
+}
+
+
+var eventNameDispatchConfigs = {}
+
+function publishEventForPlugin(dispatchConfig, pluginModule, eventName) {
+
+
+    eventNameDispatchConfigs[eventName] = dispatchConfig;
+    var phasedRegistrationNames = dispatchConfig.phasedRegistrationNames;
+
+    if (phasedRegistrationNames) {
+        for (var phaseName in phasedRegistrationNames) {
+            if (phasedRegistrationNames.hasOwnProperty(phaseName)) {
+                var phasedRegistrationName = phasedRegistrationNames[phaseName];
+                publishRegistrationName(phasedRegistrationName, pluginModule, eventName);
+            }
+        }
+        return true;
+    } else if (dispatchConfig.registrationName) {
+        publishRegistrationName(dispatchConfig.registrationName, pluginModule, eventName);
+        return true;
+    }
+
+    return false;
+}
+
+function publishRegistrationName(registrationName, pluginModule, eventName) {
+
+    registrationNameModules[registrationName] = pluginModule;
+    registrationNameDependencies[registrationName] = pluginModule.eventTypes[eventName].dependencies;
+
+    {
+        var lowerCasedName = registrationName.toLowerCase();
+        possibleRegistrationNames[lowerCasedName] = registrationName;
+
+        if (registrationName === 'onDoubleClick') {
+            possibleRegistrationNames.ondblclick = registrationName;
+        }
+    }
+}
+
+
+
+
+
+
+//-------------------?
+
+
+var discreteReplayableEvents = [TOP_MOUSE_DOWN, TOP_MOUSE_UP, TOP_TOUCH_CANCEL, TOP_TOUCH_END, TOP_TOUCH_START, TOP_AUX_CLICK, TOP_DOUBLE_CLICK, TOP_POINTER_CANCEL, TOP_POINTER_DOWN, TOP_POINTER_UP, TOP_DRAG_END, TOP_DRAG_START, TOP_DROP, TOP_COMPOSITION_END, TOP_COMPOSITION_START, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_INPUT, TOP_TEXT_INPUT, TOP_CLOSE, TOP_CANCEL, TOP_COPY, TOP_CUT, TOP_PASTE, TOP_CLICK, TOP_CHANGE, TOP_CONTEXT_MENU, TOP_RESET, TOP_SUBMIT];
+var continuousReplayableEvents = [TOP_FOCUS, TOP_BLUR, TOP_DRAG_ENTER, TOP_DRAG_LEAVE, TOP_MOUSE_OVER, TOP_MOUSE_OUT, TOP_POINTER_OVER, TOP_POINTER_OUT, TOP_GOT_POINTER_CAPTURE, TOP_LOST_POINTER_CAPTURE];
+
+
+
+function dispatchEvent(topLevelType, eventSystemFlags, container, nativeEvent) {
+    if (!_enabled) {
+        return;
+    }
+
+    if (hasQueuedDiscreteEvents() &&
+        (topLevelType)) {
+        // If we already have a queue of discrete events, and this is another discrete
+        // event, then we can't dispatch it regardless of its target, since they
+        // need to dispatch in order.
+        queueDiscreteEvent(null, // Flags that we're not actually blocked on anything as far as we know.
+            topLevelType, eventSystemFlags, container, nativeEvent);
+        return;
+    }
+
+    var blockedOn = attemptToDispatchEvent(topLevelType, eventSystemFlags, container, nativeEvent);
+
+    if (blockedOn === null) {
+        // We successfully dispatched this event.
+        clearIfContinuousEvent(topLevelType, nativeEvent);
+        return;
+    }
+
+    if (isReplayableDiscreteEvent(topLevelType)) {
+        // This this to be replayed later once the target is available.
+        queueDiscreteEvent(blockedOn, topLevelType, eventSystemFlags, container, nativeEvent);
+        return;
+    }
+
+    if (queueIfContinuousEvent(blockedOn, topLevelType, eventSystemFlags, container, nativeEvent)) {
+        return;
+    } // We need to clear only if we didn't queue because
+    // queueing is accummulative.
+
+
+    clearIfContinuousEvent(topLevelType, nativeEvent); // This is not replayable so we'll invoke it but without a target,
+    // in case the event system needs to trace it.
+
+    {
+        dispatchEventForLegacyPluginEventSystem(topLevelType, eventSystemFlags, nativeEvent, null);
+    }
+}
+
+
+if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof document !== 'undefined' && typeof document.createEvent === 'function') {
+    var fakeNode = document.createElement('react');
+
+    var invokeGuardedCallbackDev = function (name, func, context, a, b, c, d, e, f) {
+        // If document doesn't exist we know for sure we will crash in this method
+        // when we call document.createEvent(). However this can cause confusing
+        // errors: https://github.com/facebookincubator/create-react-app/issues/3482
+        // So we preemptively throw with a better message instead.
+        if (!(typeof document !== 'undefined')) {
+            {
+                throw Error("The `document` global was defined when React was initialized, but is not defined anymore. This can happen in a test environment if a component schedules an update from an asynchronous callback, but the test has already finished running. To solve this, you can either unmount the component at the end of your test (and ensure that any asynchronous operations get canceled in `componentWillUnmount`), or you can change the test itself to be asynchronous.");
+            }
+        }
+
+        var evt = document.createEvent('Event'); // Keeps track of whether the user-provided callback threw an error. We
+        // set this to true at the beginning, then set it to false right after
+        // calling the function. If the function errors, `didError` will never be
+        // set to false. This strategy works even if the browser is flaky and
+        // fails to call our global error handler, because it doesn't rely on
+        // the error event at all.
+
+        var didError = true; // Keeps track of the value of window.event so that we can reset it
+        // during the callback to let user code access window.event in the
+        // browsers that support it.
+
+        var windowEvent = window.event; // Keeps track of the descriptor of window.event to restore it after event
+        // dispatching: https://github.com/facebook/react/issues/13688
+
+        var windowEventDescriptor = Object.getOwnPropertyDescriptor(window, 'event'); // Create an event handler for our fake event. We will synchronously
+        // dispatch our fake event using `dispatchEvent`. Inside the handler, we
+        // call the user-provided callback.
+
+        var funcArgs = Array.prototype.slice.call(arguments, 3);
+
+        function callCallback() {
+            // We immediately remove the callback from event listeners so that
+            // nested `invokeGuardedCallback` calls do not clash. Otherwise, a
+            // nested call would trigger the fake event handlers of any call higher
+            // in the stack.
+            fakeNode.removeEventListener(evtType, callCallback, false); // We check for window.hasOwnProperty('event') to prevent the
+            // window.event assignment in both IE <= 10 as they throw an error
+            // "Member not found" in strict mode, and in Firefox which does not
+            // support window.event.
+
+            if (typeof window.event !== 'undefined' && window.hasOwnProperty('event')) {
+                window.event = windowEvent;
+            }
+
+            func.apply(context, funcArgs);
+            didError = false;
+        } // Create a global error event handler. We use this to capture the value
+        // that was thrown. It's possible that this error handler will fire more
+        // than once; for example, if non-React code also calls `dispatchEvent`
+        // and a handler for that event throws. We should be resilient to most of
+        // those cases. Even if our error event handler fires more than once, the
+        // last error event is always used. If the callback actually does error,
+        // we know that the last error event is the correct one, because it's not
+        // possible for anything else to have happened in between our callback
+        // erroring and the code that follows the `dispatchEvent` call below. If
+        // the callback doesn't error, but the error event was fired, we know to
+        // ignore it because `didError` will be false, as described above.
+
+
+        var error; // Use this to track whether the error event is ever called.
+
+        var didSetError = false;
+        var isCrossOriginError = false;
+
+        function handleWindowError(event) {
+            error = event.error;
+            didSetError = true;
+
+            if (error === null && event.colno === 0 && event.lineno === 0) {
+                isCrossOriginError = true;
+            }
+
+            if (event.defaultPrevented) {
+                // Some other error handler has prevented default.
+                // Browsers silence the error report if this happens.
+                // We'll remember this to later decide whether to log it or not.
+                if (error != null && typeof error === 'object') {
+                    try {
+                        error._suppressLogging = true;
+                    } catch (inner) { // Ignore.
+                    }
+                }
+            }
+        } // Create a fake event type.
+
+
+        var evtType = "react-" + (name ? name : 'invokeguardedcallback'); // Attach our event handlers
+
+        window.addEventListener('error', handleWindowError);
+        fakeNode.addEventListener(evtType, callCallback, false); // Synchronously dispatch our fake event. If the user-provided function
+        // errors, it will trigger our global error handler.
+
+        evt.initEvent(evtType, false, false);
+        fakeNode.dispatchEvent(evt);
+
+        if (windowEventDescriptor) {
+            Object.defineProperty(window, 'event', windowEventDescriptor);
+        }
+
+        if (didError) {
+            if (!didSetError) {
+                // The callback errored, but the error event never fired.
+                error = new Error('An error was thrown inside one of your components, but React ' + "doesn't know what it was. This is likely due to browser " + 'flakiness. React does its best to preserve the "Pause on ' + 'exceptions" behavior of the DevTools, which requires some ' + "DEV-mode only tricks. It's possible that these don't work in " + 'your browser. Try triggering the error in production mode, ' + 'or switching to a modern browser. If you suspect that this is ' + 'actually an issue with React, please file an issue.');
+            } else if (isCrossOriginError) {
+                error = new Error("A cross-origin error was thrown. React doesn't have access to " + 'the actual error object in development. ' + 'See https://fb.me/react-crossorigin-error for more information.');
+            }
+
+            this.onError(error);
+        } // Remove our event listeners
+
+
+        window.removeEventListener('error', handleWindowError);
+    };
+
+    invokeGuardedCallbackImpl = invokeGuardedCallbackDev;
+}
+
+function isReplayableDiscreteEvent(eventType) {
+    return discreteReplayableEvents.indexOf(eventType) > -1;
+}
+
+function trapBubbledEvent(topLevelType, element) {
+    trapEventForPluginEventSystem(element, topLevelType, false);
+}
+
+function trapEventForPluginEventSystem(container, topLevelType, capture) {
+    var listener;
+
+    switch (getEventPriorityForPluginSystem(topLevelType)) {
+        case DiscreteEvent:
+            listener = dispatchDiscreteEvent.bind(null, topLevelType, PLUGIN_EVENT_SYSTEM, container);
+            break;
+
+        case UserBlockingEvent:
+            listener = dispatchUserBlockingUpdate.bind(null, topLevelType, PLUGIN_EVENT_SYSTEM, container);
+            break;
+
+        case ContinuousEvent:
+        default:
+            listener = dispatchEvent.bind(null, topLevelType, PLUGIN_EVENT_SYSTEM, container);
+            break;
+    }
+
+    var rawEventName = getRawEventName(topLevelType);
+
+    if (capture) {
+        addEventCaptureListener(container, rawEventName, listener);
+    } else {
+        addEventBubbleListener(container, rawEventName, listener);
+    }
+}
+
+function dispatchDiscreteEvent(topLevelType, eventSystemFlags, container, nativeEvent) {
+    flushDiscreteUpdatesIfNeeded(nativeEvent.timeStamp);
+    discreteUpdates(dispatchEvent, topLevelType, eventSystemFlags, container, nativeEvent);
+}
+
+function dispatchUserBlockingUpdate(topLevelType, eventSystemFlags, container, nativeEvent) {
+    runWithPriority(UserBlockingPriority, dispatchEvent.bind(null, topLevelType, eventSystemFlags, container, nativeEvent));
+}
+
+
+
+
+
+
+function invokeGuardedCallback(name, func, context, a, b, c, d, e, f) {
+    hasError = false;
+    caughtError = null;
+    invokeGuardedCallbackImpl$1.apply(reporter, arguments);
+}
+
+function invokeGuardedCallbackAndCatchFirstError(name, func, context, a, b, c, d, e, f) {
+    invokeGuardedCallback.apply(this, arguments);
+
+    if (hasError) {
+        var error = clearCaughtError();
+
+        if (!hasRethrowError) {
+            hasRethrowError = true;
+            rethrowError = error;
+        }
+    }
+}
+
+function executeDispatch(event, listener, inst) {
+    var type = event.type || 'unknown-event';
+    event.currentTarget = getNodeFromInstance(inst);
+    invokeGuardedCallbackAndCatchFirstError(type, listener, undefined, event);
+    event.currentTarget = null;
+}
+
+
+function executeDispatchesInOrder(event) {
+    var dispatchListeners = event._dispatchListeners;
+    var dispatchInstances = event._dispatchInstances;
+
+    {
+        validateEventDispatches(event);
+    }
+
+    if (Array.isArray(dispatchListeners)) {
+        for (var i = 0; i < dispatchListeners.length; i++) {
+            if (event.isPropagationStopped()) {
+                break;
+            } // Listeners and Instances are two parallel arrays that are always in sync.
+
+
+            executeDispatch(event, dispatchListeners[i], dispatchInstances[i]);
+        }
+    } else if (dispatchListeners) {
+        executeDispatch(event, dispatchListeners, dispatchInstances);
+    }
+
+    event._dispatchListeners = null;
+    event._dispatchInstances = null;
+}
+
+var executeDispatchesAndRelease = function (event) {
+    if (event) {
+        executeDispatchesInOrder(event);
+
+        if (!event.isPersistent()) {
+            event.constructor.release(event);
+        }
+    }
+};
+
+var executeDispatchesAndReleaseTopLevel = function (e) {
+    return executeDispatchesAndRelease(e);
+};
+
+
+function runEventsInBatch(events) {
+    if (events !== null) {
+        eventQueue = accumulateInto(eventQueue, events);
+    } // Set `eventQueue` to null before processing it so that we can tell if more
+    // events get enqueued while processing.
+
+
+    var processingEventQueue = eventQueue;
+    eventQueue = null;
+
+    if (!processingEventQueue) {
+        return;
+    }
+
+    forEachAccumulated(processingEventQueue, executeDispatchesAndReleaseTopLevel);
+
+    if (!!eventQueue) {
+        {
+            throw Error("processEventQueue(): Additional events were enqueued while processing an event queue. Support for this has not yet been implemented.");
+        }
+    } // This would be a good time to rethrow if any of the event handlers threw.
+
+
+    rethrowCaughtError();
+}
+
+function runExtractedPluginEventsInBatch(topLevelType, targetInst, nativeEvent, nativeEventTarget, eventSystemFlags) {
+    var events = extractPluginEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget, eventSystemFlags);
+    runEventsInBatch(events);
+}
+
+
+function handleTopLevel(bookKeeping) {
+    var targetInst = bookKeeping.targetInst; // Loop through the hierarchy, in case there's any nested components.
+    // It's important that we build the array of ancestors before calling any
+    // event handlers, because event handlers can modify the DOM, leading to
+    // inconsistencies with ReactMount's node cache. See #1105.
+
+    var ancestor = targetInst;
+
+    do {
+        if (!ancestor) {
+            var ancestors = bookKeeping.ancestors;
+            ancestors.push(ancestor);
+            break;
+        }
+
+        var root = findRootContainerNode(ancestor);
+
+        if (!root) {
+            break;
+        }
+
+        var tag = ancestor.tag;
+
+        if (tag === HostComponent || tag === HostText) {
+            bookKeeping.ancestors.push(ancestor);
+        }
+
+        ancestor = getClosestInstanceFromNode(root);
+    } while (ancestor);
+
+    for (var i = 0; i < bookKeeping.ancestors.length; i++) {
+        targetInst = bookKeeping.ancestors[i];
+        var eventTarget = getEventTarget(bookKeeping.nativeEvent);
+        var topLevelType = bookKeeping.topLevelType;
+        var nativeEvent = bookKeeping.nativeEvent;
+        var eventSystemFlags = bookKeeping.eventSystemFlags; // If this is the first ancestor, we mark it on the system flags
+
+        if (i === 0) {
+            eventSystemFlags |= IS_FIRST_ANCESTOR;
+        }
+
+        runExtractedPluginEventsInBatch(topLevelType, targetInst, nativeEvent, eventTarget, eventSystemFlags);
+    }
+}
+
+function dispatchEventForLegacyPluginEventSystem(topLevelType, eventSystemFlags, nativeEvent, targetInst) {
+    var bookKeeping = getTopLevelCallbackBookKeeping(topLevelType, nativeEvent, targetInst, eventSystemFlags);
+
+    try {
+        // Event queue being processed in the same cycle allows
+        // `preventDefault`.
+        batchedEventUpdates(handleTopLevel, bookKeeping);
+    } finally {
+        releaseTopLevelCallbackBookKeeping(bookKeeping);
+    }
+}
+
+
+
+function getVendorPrefixedEventName(eventName) {
+    if (prefixedEventNames[eventName]) {
+        return prefixedEventNames[eventName];
+    } else if (!vendorPrefixes[eventName]) {
+        return eventName;
+    }
+
+    var prefixMap = vendorPrefixes[eventName];
+
+    for (var styleProp in prefixMap) {
+        if (prefixMap.hasOwnProperty(styleProp)) {
+            return prefixedEventNames[eventName] = prefixMap[styleProp];
+        }
+    }
+
+    return eventName;
+}
+
+function unsafeCastStringToDOMTopLevelType(topLevelType) {
+    return topLevelType;
+}
