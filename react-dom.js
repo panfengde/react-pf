@@ -205,7 +205,7 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
 
     //_assign方法用于将所有可枚举属性的值从一个或多个源对象复制到目标对象。它将返回目标对象。
     function _assign(target, ...source) {
-        return Object.assign(target, ...sources)
+        return Object.assign(target, ...source)
     }
 
     function isCustomComponent(tagName, props) {
@@ -968,7 +968,7 @@ var classComponentUpdater = {}
         //createWorkInProgress(current, pendingProps) 函数在生成针对hostTag的workInProgress时，赋值workInProgress.effectTag=noEfect
         //后面没看到哪里修改了针对HostTag的workInProgress.effect属性
 
-        
+
         if (finishedWork.effectTag > PerformedWork) {
             //第一次render不走这里，不知道什么用处，暂时不管
 
@@ -1143,7 +1143,7 @@ var classComponentUpdater = {}
             //（不应该跟踪副作用 ，shouldTrackSideEffects都为false,）
             //只有fiber树的根结点会记录effect
             while (nextEffect !== null) {
-                debugger
+
                 var effectTag = nextEffect.effectTag;
 
                 //如果有文字节点，则将value 置为''
@@ -1168,7 +1168,7 @@ var classComponentUpdater = {}
 
                 switch (primaryEffectTag) {
                     //插入新节点
-                    case Placement: {//2
+                    case Placement: { //2
                         //针对该节点及子节点进行插入操作
                         commitPlacement(nextEffect); // Clear the "placement" from effect tag so that we know that this is
                         // inserted, before any life-cycles like componentDidMount gets called.
@@ -1179,7 +1179,7 @@ var classComponentUpdater = {}
                         break;
                     }
 
-                    case PlacementAndUpdate: {//6
+                    case PlacementAndUpdate: { //6
                         //第一次render
                         //针对该节点及子节点进行插入操作
                         // Placement
@@ -1195,12 +1195,12 @@ var classComponentUpdater = {}
                         break;
                     }
 
-                    case Hydrating: {//1024
+                    case Hydrating: { //1024
                         nextEffect.effectTag &= ~Hydrating;
                         break;
                     }
 
-                    case HydratingAndUpdate: {//1028
+                    case HydratingAndUpdate: { //1028
                         nextEffect.effectTag &= ~Hydrating; // Update
 
                         var _current2 = nextEffect.alternate;
@@ -1209,13 +1209,13 @@ var classComponentUpdater = {}
                     }
                     //更新节点
                     //旧节点->新节点
-                    case Update: {//4
+                    case Update: { //4
                         var _current3 = nextEffect.alternate;
                         commitWork(_current3, nextEffect);
                         break;
                     }
 
-                    case Deletion: {//8
+                    case Deletion: { //8
                         //删除节点
                         commitDeletion(root, nextEffect, renderPriorityLevel);
                         break;
@@ -1333,7 +1333,7 @@ var classComponentUpdater = {}
             if (isHost) {
                 //stateNode是整理好的dom树结构，可以之间insert进dom中
                 // var stateNode = isHost ? node.stateNode : node.stateNode.instance;
-                var stateNode =node.stateNode
+                var stateNode = node.stateNode
 
                 if (before) {
                     insertInContainerBefore(parent, stateNode, before);
@@ -1495,7 +1495,7 @@ var classComponentUpdater = {}
     //↓↓↓↓↓↓--------commitLayoutEffects---------↓↓↓↓↓↓
     {
         function commitLayoutEffects(root, committedExpirationTime) {
-            //debugger
+
             // TODO: Should probably move the bulk of this function to commitWork.
             while (nextEffect !== null) {
 
@@ -1980,7 +1980,7 @@ var classComponentUpdater = {}
 
         switch (tag) {
             default:
-            
+
                 break;
         }
     }
@@ -1992,6 +1992,7 @@ var classComponentUpdater = {}
                 continue;
             }
             var nextProp = nextProps[propKey];
+
             if (propKey === "style") {
                 {
                     if (nextProp) {
@@ -2023,6 +2024,10 @@ var classComponentUpdater = {}
                 } else if (typeof nextProp === 'number') {
                     setTextContent(domElement, '' + nextProp);
                 }
+            } else if (propKey.substr(0,2)=="on") { 
+                // console.log("action",propKey.toLowerCase().substring(2))
+                domListen(domElement,propKey.toLowerCase().substring(2),nextProp)
+
             }
         }
     }
@@ -2563,7 +2568,7 @@ var classComponentUpdater = {}
 
 
     function forceUnmountCurrentAndReconcile(current, workInProgress, nextChildren, renderExpirationTime) {
-        debugger
+
         // This function is fork of reconcileChildren. It's used in cases where we
         // want to reconcile without matching against the existing set. This has the
         // effect of all current children being unmounted; even if the type and key
@@ -3368,5 +3373,28 @@ function updateClassInstance(current, workInProgress, ctor, newProps, renderExpi
     return shouldUpdate;
 }
 
+//↓↓↓↓↓↓--------render主流程--me---------↓↓↓↓↓↓
+
+function domListen(dom,event,callBack){
+    dom.addEventListener(event,callBack)
+    
+}
+
+/* var config = { DOMNodeRemoved: true };
 
 
+var observer = new MutationObserver(function (mutationsList, observer) {
+    for (var mutation of mutationsList) {
+        if (mutation.type == 'childList') {
+            console.log('子元素被修改');
+        }
+        else if (mutation.type == 'attributes') {
+            console.log(mutation.attributeName + '属性被修改');
+        }
+    }
+});
+
+
+//开始观测
+observer.observe(box, config); */
+//↑↑↑↑↑↑--------render主流程--me---------↑↑↑↑↑↑

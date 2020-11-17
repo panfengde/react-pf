@@ -48,16 +48,21 @@
             componentDidMount() {
                 console.log("componentDidMount")
             }
-
+            setHello() {
+                this.setSate({
+                    hello: "改变"
+                })
+            }
+            
             render() {
                 return (
                     <div index={"链条6"} >
                         <div index={"链条5"}>
                             <div index={"链条3"}>
                                 11
-                                <div index={"链条1"} style={{ color: "red" }} onClick={() => { alert(1) }}  >111</div>
+                                <div index={"链条1"} style={{ color: "red" }} onClick={() => { alert(1) }}  >{this.state.hello}</div>
                                 <div index={"链条2"} >2222</div>
-                                <button onClick={() => { alert(1) }} >click</button>
+                                <button onClick={this.setHello.bind(this)} >click</button>
                             </div>
                             <BB />
                             <div index={"链条4"} />
@@ -87,8 +92,6 @@
 
         console.log((num | 4).toString(2))
         console.log((num & 4).toString(2))
-
-
     </script>
 
 </body>
