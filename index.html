@@ -35,7 +35,10 @@
         class App extends React.Component {
             constructor(props) {
                 super(props)
-                this.state = { hello: "888888" }
+                this.state = {
+                    hello: "888888",
+                    go: "222",
+                }
             }
 
             a_getSnapshotBeforeUpdate(a, b) {
@@ -45,24 +48,62 @@
             componentWillMount() {
                 console.log("componentWillMount")
             }
+
             componentDidMount() {
                 console.log("componentDidMount")
             }
+
             setHello() {
-                this.setSate({
-                    hello: "改变"
+                this.setState({
+                    hello: "改变1",
+                    go: "改变ok",
+                })
+
+                console.log("000199191")
+                this.setState({
+                    hello: "改变2"
+                })
+
+                console.log("000199191")
+                this.setState({
+                    hello: "改变3"
                 })
             }
-            
+
+            selectAction() {
+                this.setState({
+                    go: "改变1",
+                })
+                this.setState({
+                    go: "改变2",
+                })
+                this.setState({
+                    go: "改变3",
+                })
+            }
+
+            clickDom() {
+                alert(3)
+                this.state.hello = "强制更新"
+                this.forceUpdate()
+            }
+
             render() {
+                console.log(this)
+
+                console.log(<div>{this.state.hello}</div>)
                 return (
                     <div index={"链条6"} >
                         <div index={"链条5"}>
                             <div index={"链条3"}>
                                 11
-                                <div index={"链条1"} style={{ color: "red" }} onClick={() => { alert(1) }}  >{this.state.hello}</div>
-                                <div index={"链条2"} >2222</div>
+                                <div index={"链条1"} style={{ color: "red" }} onClick={this.clickDom.bind(this)}  >{this.state.hello}</div>
+                                <div index={"链条2"} >{this.state.go}</div>
                                 <button onClick={this.setHello.bind(this)} >click</button>
+                                <select name="" id="" onChange={this.selectAction.bind(this)}>
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                </select>
                             </div>
                             <BB />
                             <div index={"链条4"} />
@@ -80,18 +121,11 @@
             document.getElementById('root')
         );
 
+        console.log(document.getElementById('root')._reactRootContainer)
 
 
-        var num = 2048
-        console.log("--------")
-        console.log(Number(4096).toString(2))
-        console.log("--------")
 
 
-        console.log(num.toString(2), Number(4).toString(2))
-
-        console.log((num | 4).toString(2))
-        console.log((num & 4).toString(2))
     </script>
 
 </body>

@@ -1,3 +1,5 @@
+let a_panfeng = 0
+
 //↓↓↓↓↓↓--------***---------↓↓↓↓↓↓
 //↑↑↑↑↑↑--------***---------↑↑↑↑↑↑
 
@@ -5,6 +7,13 @@ const ReactDOM = {}
 var workInProgress = null; //工作单元代理变量
 var nextEffect = null;
 var REACT_ELEMENT_TYPE = Symbol.for('react.element')
+
+var emptyContextObject = {};
+
+var ImmediatePriority = 99;
+var renderOk = false; 
+//我自己定义的变量
+
 
 //↓↓↓↓↓↓--------关于时间的常量---------↓↓↓↓↓↓
 {
@@ -113,8 +122,6 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
 
 }
 //↑↑↑↑↑↑--------还不知道作用的常量---------↑↑↑↑↑↑
-
-
 
 
 //↓↓↓↓↓↓--------生命周期---------↓↓↓↓↓↓
@@ -557,7 +564,7 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
      * 原来如果有pengding现在就顺延为下一个
      * 
      */
-    function enqueueUpdate(fiber, update) {
+    /* function enqueueUpdate(fiber, update) {
 
         //更新后面
         var updateQueue = fiber.updateQueue;
@@ -573,6 +580,31 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
         }
 
         sharedQueue.pending = update;
+    } */
+
+    function enqueueUpdate(fiber, update) {
+
+        //更新后面
+        var updateQueue = fiber.updateQueue;
+
+        if (updateQueue === null) {
+            // Only occurs if the fiber has been unmounted.
+            return;
+        }
+
+        var sharedQueue = updateQueue.shared;
+        var pending = sharedQueue.pending;
+
+        if (pending === null) {
+            // This is the first update. Create a circular list.
+            update.next = update;
+        } else {
+            update.next = pending.next;
+            pending.next = update;
+        }
+
+        sharedQueue.pending = update;
+
     }
 
     /**
@@ -905,7 +937,6 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
 }
 //↑↑↑↑↑↑--------关于DOM的操作---------↑↑↑↑↑↑
 
-var classComponentUpdater = {}
 
 
 
@@ -955,6 +986,13 @@ var classComponentUpdater = {}
         //因为下面在对finishedWork、expirationTime 进行 commit后，任务就完成了
         root.finishedWork = null;
         root.finishedExpirationTime = NoWork;
+
+
+        //commitRoot 是最后阶段，不会再被异步调用了，所以会清除callback相关的属性
+        root.callbackNode = null;
+        /*  root.callbackExpirationTime = NoWork;
+         // root.callbackPriority = NoPriority;
+         root.nextKnownPendingLevel = NoWork; */
 
         //获取 effect 链
         //根据effect链，来渲染dom的变化情况
@@ -1488,6 +1526,292 @@ var classComponentUpdater = {}
 
             updateProperties(domElement, updatePayload, type, oldProps, newProps);
         }
+
+        function commitDeletion(finishedRoot, current, renderPriorityLevel) {
+            {
+                // Recursively delete all host nodes from the parent.
+                // Detach refs and call componentWillUnmount() on the whole subtree.
+                unmountHostComponents(finishedRoot, current, renderPriorityLevel);
+            }
+
+            detachFiber(current);
+        }
+
+
+        function commitNestedUnmounts(finishedRoot, root, renderPriorityLevel) {
+            // While we're inside a removed host node we don't want to call
+            // removeChild on the inner nodes because they're removed by the top
+            // call anyway. We also want to call componentWillUnmount on all
+            // composites before this host node is removed from the tree. Therefore
+            // we do an inner loop while we're still inside the host node.
+            var node = root;
+
+            while (true) {
+                commitUnmount(finishedRoot, node, renderPriorityLevel); // Visit children because they may contain more composite or host nodes.
+                // Skip portals because commitUnmount() currently visits them recursively.
+
+                if (node.child !== null && ( // If we use mutation we drill down into portals using commitUnmount above.
+                        // If we don't use mutation we drill down into portals here instead.
+                        node.tag !== HostPortal)) {
+                    node.child.return = node;
+                    node = node.child;
+                    continue;
+                }
+
+                if (node === root) {
+                    return;
+                }
+
+                while (node.sibling === null) {
+                    if (node.return === null || node.return === root) {
+                        return;
+                    }
+
+                    node = node.return;
+                }
+
+                node.sibling.return = node.return;
+                node = node.sibling;
+            }
+        }
+
+        function removeChildFromContainer(container, child) {
+            if (container.nodeType === COMMENT_NODE) {
+                container.parentNode.removeChild(child);
+            } else {
+                container.removeChild(child);
+            }
+        }
+
+        function removeChild(parentInstance, child) {
+            parentInstance.removeChild(child);
+        }
+
+
+
+        function commitUnmount(finishedRoot, current, renderPriorityLevel) {
+            // onCommitUnmount(current);
+
+            switch (current.tag) {
+                /* case FunctionComponent:
+              case ForwardRef:
+              case MemoComponent:
+              case SimpleMemoComponent:
+              case Block: {
+                var updateQueue = current.updateQueue;
+      
+                if (updateQueue !== null) {
+                  var lastEffect = updateQueue.lastEffect;
+      
+                  if (lastEffect !== null) {
+                    var firstEffect = lastEffect.next;
+      
+                    {
+                      // When the owner fiber is deleted, the destroy function of a passive
+                      // effect hook is called during the synchronous commit phase. This is
+                      // a concession to implementation complexity. Calling it in the
+                      // passive effect phase (like they usually are, when dependencies
+                      // change during an update) would require either traversing the
+                      // children of the deleted fiber again, or including unmount effects
+                      // as part of the fiber effect list.
+                      //
+                      // Because this is during the sync commit phase, we need to change
+                      // the priority.
+                      //
+                      // TODO: Reconsider this implementation trade off.
+                      var priorityLevel = renderPriorityLevel > NormalPriority ? NormalPriority : renderPriorityLevel;
+                      runWithPriority$1(priorityLevel, function () {
+                        var effect = firstEffect;
+      
+                        do {
+                          var _destroy = effect.destroy;
+      
+                          if (_destroy !== undefined) {
+                            safelyCallDestroy(current, _destroy);
+                          }
+      
+                          effect = effect.next;
+                        } while (effect !== firstEffect);
+                      });
+                    }
+                  }
+                }
+      
+                return;
+              } */
+
+                case ClassComponent: {
+                    //safelyDetachRef(current);
+                    var instance = current.stateNode;
+
+                    if (typeof instance.componentWillUnmount === 'function') {
+                        instance.componentWillUnmount()
+                        // safelyCallComponentWillUnmount(current, instance);
+                    }
+
+                    return;
+                }
+
+                case HostComponent: {
+
+                    //safelyDetachRef(current);
+                    return;
+                }
+
+                /*   case HostPortal: {
+                // TODO: this is recursive.
+                // We are also not using this parent because
+                // the portal will get pushed immediately.
+                {
+                  unmountHostComponents(finishedRoot, current, renderPriorityLevel);
+                }
+      
+                return;
+              }
+      
+              case FundamentalComponent: {
+      
+                return;
+              }
+      
+              case DehydratedFragment: {
+      
+                return;
+              }
+      
+              case ScopeComponent: {
+      
+                return;
+              } */
+            }
+        }
+
+        function unmountHostComponents(finishedRoot, current, renderPriorityLevel) {
+            // We only have the top Fiber that was deleted but we need to recurse down its
+            // children to find all the terminal nodes.
+            var node = current; // Each iteration, currentParent is populated with node's host parent if not
+            // currentParentIsValid.
+
+            var currentParentIsValid = false; // Note: these two variables *must* always be updated together.
+
+            var currentParent;
+            var currentParentIsContainer;
+
+            while (true) {
+                if (!currentParentIsValid) {
+                    var parent = node.return;
+
+                    findParent: while (true) {
+                        if (!(parent !== null)) {
+                            {
+                                throw Error("Expected to find a host parent. This error is likely caused by a bug in React. Please file an issue.");
+                            }
+                        }
+
+                        var parentStateNode = parent.stateNode;
+
+                        switch (parent.tag) {
+                            case HostComponent:
+                                currentParent = parentStateNode;
+                                currentParentIsContainer = false;
+                                break findParent;
+
+                            case HostRoot:
+                                currentParent = parentStateNode.containerInfo;
+                                currentParentIsContainer = true;
+                                break findParent;
+
+                            case HostPortal:
+                                currentParent = parentStateNode.containerInfo;
+                                currentParentIsContainer = true;
+                                break findParent;
+
+                        }
+
+                        parent = parent.return;
+                    }
+
+                    currentParentIsValid = true;
+                }
+
+                if (node.tag === HostComponent || node.tag === HostText) {
+                    commitNestedUnmounts(finishedRoot, node, renderPriorityLevel); // After all the children have unmounted, it is now safe to remove the
+                    // node from the tree.
+
+                    if (currentParentIsContainer) {
+                        removeChildFromContainer(currentParent, node.stateNode);
+                    } else {
+                        removeChild(currentParent, node.stateNode);
+                    } // Don't visit children because we already visited them.
+
+                } else if (node.tag === HostPortal) {
+                    if (node.child !== null) {
+                        // When we go into a portal, it becomes the parent to remove from.
+                        // We will reassign it back when we pop the portal on the way up.
+                        currentParent = node.stateNode.containerInfo;
+                        currentParentIsContainer = true; // Visit children because portals might contain host components.
+
+                        node.child.return = node;
+                        node = node.child;
+                        continue;
+                    }
+                } else {
+                    commitUnmount(finishedRoot, node, renderPriorityLevel); // Visit children because we may find more host components below.
+
+                    if (node.child !== null) {
+                        node.child.return = node;
+                        node = node.child;
+                        continue;
+                    }
+                }
+
+                if (node === current) {
+                    return;
+                }
+
+                while (node.sibling === null) {
+                    if (node.return === null || node.return === current) {
+                        return;
+                    }
+
+                    node = node.return;
+
+                    if (node.tag === HostPortal) {
+                        // When we go out of the portal, we need to restore the parent.
+                        // Since we don't keep a stack of them, we will search for it.
+                        currentParentIsValid = false;
+                    }
+                }
+
+                node.sibling.return = node.return;
+                node = node.sibling;
+            }
+        }
+
+        function detachFiber(current) {
+            var alternate = current.alternate; // Cut off the return pointers to disconnect it from the tree. Ideally, we
+            // should clear the child pointer of the parent alternate to let this
+            // get GC:ed but we don't know which for sure which parent is the current
+            // one so we'll settle for GC:ing the subtree of this child. This child
+            // itself will be GC:ed when the parent updates the next time.
+
+            current.return = null;
+            current.child = null;
+            current.memoizedState = null;
+            current.updateQueue = null;
+            current.dependencies = null;
+            current.alternate = null;
+            current.firstEffect = null;
+            current.lastEffect = null;
+            current.pendingProps = null;
+            current.memoizedProps = null;
+            current.stateNode = null;
+
+            if (alternate !== null) {
+                detachFiber(alternate);
+            }
+        }
+
     }
     //↑↑↑↑↑↑--------commitMutationEffects---------↑↑↑↑↑↑
 
@@ -2024,9 +2348,9 @@ var classComponentUpdater = {}
                 } else if (typeof nextProp === 'number') {
                     setTextContent(domElement, '' + nextProp);
                 }
-            } else if (propKey.substr(0,2)=="on") { 
+            } else if (propKey.substr(0, 2) == "on") {
                 // console.log("action",propKey.toLowerCase().substring(2))
-                domListen(domElement,propKey.toLowerCase().substring(2),nextProp)
+                domListen(domElement, propKey.toLowerCase().substring(2), nextProp)
 
             }
         }
@@ -2653,6 +2977,15 @@ var classComponentUpdater = {}
             //element就是<APP/>的返回结果
             var nextChildren = nextState.element;
 
+
+            if (nextChildren === prevChildren) {
+                // If the state is the same as before, that's a bailout because we had
+                // no work that expires at this time.
+
+                return bailoutOnAlreadyFinishedWork(current, workInProgress, renderExpirationTime);
+            }
+
+
             //解析HostRoot节点的子fiber节点情况
             //根据nextChildren解析，并将解析结果赋予workInProgress.child
             reconcileChildren(current, workInProgress, nextChildren, renderExpirationTime);
@@ -2713,6 +3046,7 @@ var classComponentUpdater = {}
 
             var instance = workInProgress.stateNode;
             var shouldUpdate;
+            debugger
 
             if (instance === null) {
                 //组件第一次渲染时
@@ -2919,8 +3253,9 @@ var classComponentUpdater = {}
     //workInProgress存在值，即存在工作，那么就一直执行工作performUnitOfWork(workInProgress)
     //直到workInProgress携带的工作做完
     function workLoopSync() {
-        let a = 0
+
         while (workInProgress !== null) {
+            console.log(++a_panfeng, "------------------")
             //执行每一个workInProgress携带的工作
             workInProgress = performUnitOfWork(workInProgress);
         }
@@ -2955,6 +3290,7 @@ var classComponentUpdater = {}
      */
 
     function createWorkInProgress(current, pendingProps) {
+
         var workInProgress = current.alternate;
         if (workInProgress === null) {
             // We use a double buffering pooling technique because we know that we'll
@@ -3013,7 +3349,7 @@ var classComponentUpdater = {}
     function performSyncWorkOnRoot(root) {
         //root指的是fiberRoot，fiber数据结构的根节点
 
-
+        debugger
         var expirationTime = Sync;
 
         //给全局的workInProgress变量赋值
@@ -3024,7 +3360,7 @@ var classComponentUpdater = {}
         //完成workInProgress携带的工作 ，即完成fiber分析
         workLoopSync()
 
-        console.log(document.getElementById('root')._reactRootContainer)
+
         //commitfiber
         root.finishedWork = root.current.alternate;
         root.finishedExpirationTime = expirationTime;
@@ -3039,17 +3375,19 @@ var classComponentUpdater = {}
     //安排工作
     //expirationTime === Sync执行同步渲染。浏览器端就是这里
     function scheduleWork(fiber, expirationTime) {
-        let root = fiber.stateNode;
+        //let root = fiber.stateNode;
+        var root = markUpdateTimeFromFiberToRoot(fiber, expirationTime);
         //这里的fiber参数，传递的是fiberRoot.current
         //而fiberRoot.current.stateNode仍然指向fiberRoot----- legacyCreateRootFromDOMContainer函数里面指定的，uninitializedFiber.stateNode = root;
         //所以这里的root就是fiberRoot
-
         //搞得好绕，总之：root指的是fiberRoot，fiber数据结构的根节点
-        if (expirationTime === Sync) {
+        if (expirationTime === Sync && !renderOk) {
             // 在根目录上执行同步工作
             performSyncWorkOnRoot(root);
+            renderOk = true
         } else {
-            // 
+            ensureRootIsScheduled(root);
+            //schedulePendingInteractions(root, expirationTime);
         }
 
     }
@@ -3171,230 +3509,421 @@ var classComponentUpdater = {}
 //↑↑↑↑↑↑--------render主流程---------↑↑↑↑↑↑
 
 
+
+
+
+
+
+
+
+//↓↓↓↓↓↓--------dom事件--me---------↓↓↓↓↓↓
 {
-    //     var classComponentUpdater = {
-    //     isMounted: isMounted,
-    //     enqueueSetState: function (inst, payload, callback) {
-    //         //
-    //         console.log(++xxx_panfeng, "操作了多少次setstate")
-    //         var fiber = get(inst);
-    //         var currentTime = requestCurrentTimeForUpdate();
-    //         var suspenseConfig = requestCurrentSuspenseConfig();
-    //         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
-    //         var update = createUpdate(expirationTime, suspenseConfig);
-    //         update.payload = payload;
+    function domListen(dom, event, callBack) {
+        dom.addEventListener(event, callBack)
 
-    //         if (callback !== undefined && callback !== null) {
-    //             {
-    //                 warnOnInvalidCallback(callback, 'setState');
-    //             }
+    }
 
-    //             update.callback = callback;
-    //         }
-
-    //         enqueueUpdate(fiber, update);
-    //         scheduleWork(fiber, expirationTime);
-
-    //         //上面和ReactDOM.render中scheduleRootUpdate非常的相似。其实他们就是同一个更新原理呢
-    //         /*  （1）获取节点对应的fiber对象
-    //            （2）计算currentTime
-    //            （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
-    //            （4）根据（3）expirationTime创建update对象
-    //            （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
-    //            （6）将callback赋值到（4）update.callback
-    //            （7）update入队updateQueue
-    //            （8）进行任务调度 
-    //          */
-    //     },
-    //     enqueueReplaceState: function (inst, payload, callback) {
-    //         var fiber = get(inst);
-    //         var currentTime = requestCurrentTimeForUpdate();
-    //         var suspenseConfig = requestCurrentSuspenseConfig();
-    //         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
-    //         var update = createUpdate(expirationTime, suspenseConfig);
-    //         update.tag = ReplaceState;
-    //         update.payload = payload;
-
-    //         if (callback !== undefined && callback !== null) {
-    //             {
-    //                 warnOnInvalidCallback(callback, 'replaceState');
-    //             }
-
-    //             update.callback = callback;
-    //         }
-
-    //         enqueueUpdate(fiber, update);
-    //         scheduleWork(fiber, expirationTime);
-    //     },
-    //     enqueueForceUpdate: function (inst, callback) {
-    //         var fiber = get(inst);
-    //         var currentTime = requestCurrentTimeForUpdate();
-    //         var suspenseConfig = requestCurrentSuspenseConfig();
-    //         var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
-    //         var update = createUpdate(expirationTime, suspenseConfig);
-    //         update.tag = ForceUpdate;
-
-    //         if (callback !== undefined && callback !== null) {
-    //             {
-    //                 warnOnInvalidCallback(callback, 'forceUpdate');
-    //             }
-
-    //             update.callback = callback;
-    //         }
-
-    //         enqueueUpdate(fiber, update);
-    //         scheduleWork(fiber, expirationTime);
-
-    //         /*  （1）获取节点对应的fiber对象
-    //             （2）计算currentTime
-    //             （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
-    //             （4）根据（3）expirationTime创建update对象
-    //             （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
-    //             （6）将callback赋值到（4）update.callback
-    //             （7）update入队updateQueue
-    //             （8）进行任务调度 
-    //           */
-    //     }
-    // };
+    /* var config = { DOMNodeRemoved: true };
+    
+    
+    var observer = new MutationObserver(function (mutationsList, observer) {
+        for (var mutation of mutationsList) {
+            if (mutation.type == 'childList') {
+                console.log('子元素被修改');
+            }
+            else if (mutation.type == 'attributes') {
+                console.log(mutation.attributeName + '属性被修改');
+            }
+        }
+    });
+    
+    
+    //开始观测
+    observer.observe(box, config); */
 }
+//↑↑↑↑↑↑--------render主流程--me---------↑↑↑↑↑↑
 
 
 
-function updateClassInstance(current, workInProgress, ctor, newProps, renderExpirationTime) {
-    var instance = workInProgress.stateNode;
-    cloneUpdateQueue(current, workInProgress);
-    var oldProps = workInProgress.memoizedProps;
-    instance.props = workInProgress.type === workInProgress.elementType ? oldProps : resolveDefaultProps(workInProgress.type, oldProps);
-    var oldContext = instance.context;
-    var contextType = ctor.contextType;
-    var nextContext = emptyContextObject;
+//↓↓↓↓↓↓--------setState和forceUpdate---------↓↓↓↓↓↓
 
-    if (typeof contextType === 'object' && contextType !== null) {
-        nextContext = readContext(contextType);
-    } else {
-        var nextUnmaskedContext = getUnmaskedContext(workInProgress, ctor, true);
-        nextContext = getMaskedContext(workInProgress, nextUnmaskedContext);
-    }
+{
 
-    var getDerivedStateFromProps = ctor.getDerivedStateFromProps;
-    var hasNewLifecycles = typeof getDerivedStateFromProps === 'function' || typeof instance.getSnapshotBeforeUpdate === 'function'; // Note: During these life-cycles, instance.props/instance.state are what
-    // ever the previously attempted to render - not the "current". However,
-    // during componentDidUpdate we pass the "current" props.
-    // In order to support react-lifecycles-compat polyfilled components,
-    // Unsafe lifecycles should not be invoked for components using the new APIs.
+    function isMounted(component) {
+        {
+            var owner = ReactCurrentOwner.current;
 
-    if (!hasNewLifecycles && (typeof instance.UNSAFE_componentWillReceiveProps === 'function' || typeof instance.componentWillReceiveProps === 'function')) {
-        if (oldProps !== newProps || oldContext !== nextContext) {
-            callComponentWillReceiveProps(workInProgress, instance, newProps, nextContext);
-        }
-    }
+            if (owner !== null && owner.tag === ClassComponent) {
+                var ownerFiber = owner;
+                var instance = ownerFiber.stateNode;
 
-    resetHasForceUpdateBeforeProcessing();
-    var oldState = workInProgress.memoizedState;
-    var newState = instance.state = oldState;
-    processUpdateQueue(workInProgress, newProps, instance, renderExpirationTime);
-    newState = workInProgress.memoizedState;
+                if (!instance._warnedAboutRefsInRender) {
+                    error('%s is accessing isMounted inside its render() function. ' + 'render() should be a pure function of props and state. It should ' + 'never access something that requires stale data from the previous ' + 'render, such as refs. Move this logic to componentDidMount and ' + 'componentDidUpdate instead.', getComponentName(ownerFiber.type) || 'A component');
+                }
 
-    if (oldProps === newProps && oldState === newState && !hasContextChanged() && !checkHasForceUpdateAfterProcessing()) {
-        // If an update was already in progress, we should schedule an Update
-        // effect even though we're bailing out, so that cWU/cDU are called.
-        if (typeof instance.componentDidUpdate === 'function') {
-            if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
-                workInProgress.effectTag |= Update;
+                instance._warnedAboutRefsInRender = true;
             }
         }
 
-        if (typeof instance.getSnapshotBeforeUpdate === 'function') {
-            if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
-                workInProgress.effectTag |= Snapshot;
+        var fiber = get(component);
+
+        if (!fiber) {
+            return false;
+        }
+
+        return getNearestMountedFiber(fiber) === fiber;
+    }
+
+
+    var classComponentUpdater = {
+        isMounted: isMounted,
+        enqueueSetState: function (inst, payload, callback) {
+            debugger
+            //
+            var fiber = get(inst);
+
+            console.log(fiber)
+            var currentTime = requestCurrentTimeForUpdate();
+            //var suspenseConfig = requestCurrentSuspenseConfig();
+            var suspenseConfig = {};
+            var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
+            var update = createUpdate(expirationTime, suspenseConfig);
+            update.payload = payload;
+
+            if (callback !== undefined && callback !== null) {
+                {
+                    warnOnInvalidCallback(callback, 'setState');
+                }
+                update.callback = callback;
+            }
+            enqueueUpdate(fiber, update);
+            scheduleWork(fiber, expirationTime);
+            //上面和ReactDOM.render中scheduleRootUpdate非常的相似。其实他们就是同一个更新原理呢
+            /*  （1）获取节点对应的fiber对象
+               （2）计算currentTime
+               （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
+               （4）根据（3）expirationTime创建update对象
+               （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
+               （6）将callback赋值到（4）update.callback
+               （7）update入队updateQueue
+               （8）进行任务调度 
+             */
+        },
+        enqueueReplaceState: function (inst, payload, callback) {
+            var fiber = get(inst);
+            var currentTime = requestCurrentTimeForUpdate();
+            //var suspenseConfig = requestCurrentSuspenseConfig();
+            var suspenseConfig = {};
+            var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
+            var update = createUpdate(expirationTime, suspenseConfig);
+            update.tag = ReplaceState;
+            update.payload = payload;
+
+            if (callback !== undefined && callback !== null) {
+                {
+                    warnOnInvalidCallback(callback, 'replaceState');
+                }
+
+                update.callback = callback;
+            }
+
+            enqueueUpdate(fiber, update);
+            scheduleWork(fiber, expirationTime);
+        },
+        enqueueForceUpdate: function (inst, callback) {
+            var fiber = get(inst);
+            var currentTime = requestCurrentTimeForUpdate();
+            //var suspenseConfig = requestCurrentSuspenseConfig();
+            var suspenseConfig = {};
+            var expirationTime = computeExpirationForFiber(currentTime, fiber, suspenseConfig);
+            var update = createUpdate(expirationTime, suspenseConfig);
+            //update.tag = ForceUpdate;
+            update.tag = 2;
+
+            if (callback !== undefined && callback !== null) {
+                {
+                    warnOnInvalidCallback(callback, 'forceUpdate');
+                }
+
+                update.callback = callback;
+            }
+
+            enqueueUpdate(fiber, update);
+            scheduleWork(fiber, expirationTime);
+
+            /*  （1）获取节点对应的fiber对象
+                （2）计算currentTime
+                （3）根据（1）fiber和（2）currentTime计算fiber对象的expirationTime
+                （4）根据（3）expirationTime创建update对象
+                （5）将setState中要更新的对象赋值到（4）update.payload，ReactDOM.render是{element}
+                （6）将callback赋值到（4）update.callback
+                （7）update入队updateQueue
+                （8）进行任务调度 
+              */
+        }
+    };
+
+
+    function ensureRootIsScheduled(root) {
+        //var lastExpiredTime = root.lastExpiredTime;
+
+        var existingCallbackNode = root.callbackNode;
+        if (existingCallbackNode !== null) {
+            return
+        }
+
+        root.callbackExpirationTime = Sync;
+        root.callbackPriority = ImmediatePriority;
+        //root.callbackNode = scheduleSyncCallback(performSyncWorkOnRoot.bind(null, root));
+        root.callbackNode = runTask_panfeng(() => {
+            performSyncWorkOnRoot(root)
+        })
+
+        //commit之前会重置这个callbackNode
+    }
+
+    //跟踪需要同步执行的update们，并计数、检测它们是否会报错
+
+
+    function markUpdateTimeFromFiberToRoot(fiber, expirationTime) {
+        // Update the source fiber's expiration time
+        //如果fiber对象的过期时间小于 expirationTime，则更新fiber对象的过期时间
+        //也就是说，当前fiber的优先级是小于expirationTime的优先级的，现在要调高fiber的优先级
+        if (fiber.expirationTime < expirationTime) {
+            fiber.expirationTime = expirationTime;
+        }
+        //在enqueueUpdate()中有讲到，与fiber.current是映射关系
+        var alternate = fiber.alternate;
+        //同上
+        if (alternate !== null && alternate.expirationTime < expirationTime) {
+            alternate.expirationTime = expirationTime;
+        } // Walk the parent path to the root and update the child expiration time.
+
+        //向上遍历父节点，直到root节点，在遍历的过程中更新子节点的expirationTime
+        var node = fiber.return;
+        var root = null;
+
+        if (node === null && fiber.tag === HostRoot) {
+            root = fiber.stateNode;
+        } else {
+            while (node !== null) {
+                alternate = node.alternate;
+
+                if (node.childExpirationTime < expirationTime) {
+                    node.childExpirationTime = expirationTime;
+
+                    if (alternate !== null && alternate.childExpirationTime < expirationTime) {
+                        alternate.childExpirationTime = expirationTime;
+                    }
+                } else if (alternate !== null && alternate.childExpirationTime < expirationTime) {
+                    alternate.childExpirationTime = expirationTime;
+                }
+
+                if (node.return === null && node.tag === HostRoot) {
+                    root = node.stateNode;
+                    break;
+                }
+
+                node = node.return;
             }
         }
 
-        return false;
+
+
+        return root;
     }
 
-    if (typeof getDerivedStateFromProps === 'function') {
-        applyDerivedStateFromProps(workInProgress, ctor, getDerivedStateFromProps, newProps);
-        newState = workInProgress.memoizedState;
+    function bailoutOnAlreadyFinishedWork(current, workInProgress, renderExpirationTime) {
+        // cancelWorkTimer(workInProgress);
+
+        if (current !== null) {
+            // Reuse previous dependencies
+            workInProgress.dependencies = current.dependencies;
+        }
+
+        cloneChildFibers(current, workInProgress);
+        return workInProgress.child;
+
+
+        var childExpirationTime = workInProgress.childExpirationTime;
+
     }
 
-    var shouldUpdate = checkHasForceUpdateAfterProcessing() || checkShouldComponentUpdate(workInProgress, ctor, oldProps, newProps, oldState, newState, nextContext);
+    function cloneChildFibers(current, workInProgress) {
+        if (!(current === null || workInProgress.child === current.child)) {
+            {
+                throw Error("Resuming work not yet implemented.");
+            }
+        }
 
-    if (shouldUpdate) {
+        if (workInProgress.child === null) {
+            return;
+        }
+
+        var currentChild = workInProgress.child;
+        var newChild = createWorkInProgress(currentChild, currentChild.pendingProps);
+        workInProgress.child = newChild;
+        newChild.return = workInProgress;
+
+        while (currentChild.sibling !== null) {
+            currentChild = currentChild.sibling;
+            newChild = newChild.sibling = createWorkInProgress(currentChild, currentChild.pendingProps);
+            newChild.return = workInProgress;
+        }
+
+        newChild.sibling = null;
+    }
+
+
+    function checkShouldComponentUpdate(workInProgress, ctor, oldProps, newProps, oldState, newState, nextContext) {
+        var instance = workInProgress.stateNode;
+
+        if (typeof instance.shouldComponentUpdate === 'function') {
+            {
+                if (workInProgress.mode & StrictMode) {
+                    // Invoke the function an extra time to help detect side-effects.
+                    instance.shouldComponentUpdate(newProps, newState, nextContext);
+                }
+            }
+
+            var shouldUpdate = instance.shouldComponentUpdate(newProps, newState, nextContext);
+
+            {
+                if (shouldUpdate === undefined) {
+                    console.error('%s.shouldComponentUpdate(): Returned undefined instead of a ' + 'boolean value. Make sure to return true or false.', getComponentName(ctor) || 'Component');
+                }
+            }
+
+            return shouldUpdate;
+        }
+
+        if (ctor.prototype && ctor.prototype.isPureReactComponent) {
+            // return !shallowEqual(oldProps, newProps) || !shallowEqual(oldState, newState);
+        }
+
+        return true;
+    }
+
+    function updateClassInstance(current, workInProgress, ctor, newProps, renderExpirationTime) {
+        var instance = workInProgress.stateNode;
+        cloneUpdateQueue(current, workInProgress);
+        var oldProps = workInProgress.memoizedProps;
+        instance.props = workInProgress.type === workInProgress.elementType ? oldProps : resolveDefaultProps(workInProgress.type, oldProps);
+        var oldContext = instance.context;
+        var contextType = ctor.contextType;
+        var nextContext = emptyContextObject
+        /*  var nextContext = emptyContextObject;
+    
+        if (typeof contextType === 'object' && contextType !== null) {
+            nextContext = readContext(contextType);
+        } else {
+            var nextUnmaskedContext = getUnmaskedContext(workInProgress, ctor, true);
+            nextContext = getMaskedContext(workInProgress, nextUnmaskedContext);
+        }
+     */
+        var getDerivedStateFromProps = ctor.getDerivedStateFromProps;
+        var hasNewLifecycles = typeof getDerivedStateFromProps === 'function' || typeof instance.getSnapshotBeforeUpdate === 'function'; // Note: During these life-cycles, instance.props/instance.state are what
+        // ever the previously attempted to render - not the "current". However,
+        // during componentDidUpdate we pass the "current" props.
         // In order to support react-lifecycles-compat polyfilled components,
         // Unsafe lifecycles should not be invoked for components using the new APIs.
-        if (!hasNewLifecycles && (typeof instance.UNSAFE_componentWillUpdate === 'function' || typeof instance.componentWillUpdate === 'function')) {
-            startPhaseTimer(workInProgress, 'componentWillUpdate');
 
-            if (typeof instance.componentWillUpdate === 'function') {
-                instance.componentWillUpdate(newProps, newState, nextContext);
+        /* if (!hasNewLifecycles && (typeof instance.UNSAFE_componentWillReceiveProps === 'function' || typeof instance.componentWillReceiveProps === 'function')) {
+            if (oldProps !== newProps || oldContext !== nextContext) {
+                callComponentWillReceiveProps(workInProgress, instance, newProps, nextContext);
+            }
+        } */
+
+        // resetHasForceUpdateBeforeProcessing();
+        var oldState = workInProgress.memoizedState;
+        var newState = instance.state = oldState;
+        processUpdateQueue(workInProgress, newProps, instance, renderExpirationTime);
+        newState = workInProgress.memoizedState;
+
+        if (oldProps === newProps && oldState === newState) {
+            // If an update was already in progress, we should schedule an Update
+            // effect even though we're bailing out, so that cWU/cDU are called.
+            if (typeof instance.componentDidUpdate === 'function') {
+                if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+                    workInProgress.effectTag |= Update;
+                }
             }
 
-            if (typeof instance.UNSAFE_componentWillUpdate === 'function') {
-                instance.UNSAFE_componentWillUpdate(newProps, newState, nextContext);
+            if (typeof instance.getSnapshotBeforeUpdate === 'function') {
+                if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+                    workInProgress.effectTag |= Snapshot;
+                }
             }
 
-            stopPhaseTimer();
+            return false;
         }
 
-        if (typeof instance.componentDidUpdate === 'function') {
-            workInProgress.effectTag |= Update;
+        if (typeof getDerivedStateFromProps === 'function') {
+            applyDerivedStateFromProps(workInProgress, ctor, getDerivedStateFromProps, newProps);
+            newState = workInProgress.memoizedState;
         }
 
-        if (typeof instance.getSnapshotBeforeUpdate === 'function') {
-            workInProgress.effectTag |= Snapshot;
-        }
-    } else {
-        // If an update was already in progress, we should schedule an Update
-        // effect even though we're bailing out, so that cWU/cDU are called.
-        if (typeof instance.componentDidUpdate === 'function') {
-            if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+        var shouldUpdate = checkShouldComponentUpdate(workInProgress, ctor, oldProps, newProps, oldState, newState, nextContext);
+
+        if (shouldUpdate) {
+            // In order to support react-lifecycles-compat polyfilled components,
+            // Unsafe lifecycles should not be invoked for components using the new APIs.
+            if (!hasNewLifecycles && (typeof instance.UNSAFE_componentWillUpdate === 'function' || typeof instance.componentWillUpdate === 'function')) {
+                startPhaseTimer(workInProgress, 'componentWillUpdate');
+
+                if (typeof instance.componentWillUpdate === 'function') {
+                    instance.componentWillUpdate(newProps, newState, nextContext);
+                }
+
+                if (typeof instance.UNSAFE_componentWillUpdate === 'function') {
+                    instance.UNSAFE_componentWillUpdate(newProps, newState, nextContext);
+                }
+
+                stopPhaseTimer();
+            }
+
+            if (typeof instance.componentDidUpdate === 'function') {
                 workInProgress.effectTag |= Update;
             }
-        }
 
-        if (typeof instance.getSnapshotBeforeUpdate === 'function') {
-            if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+            if (typeof instance.getSnapshotBeforeUpdate === 'function') {
                 workInProgress.effectTag |= Snapshot;
             }
-        } // If shouldComponentUpdate returned false, we should still update the
-        // memoized props/state to indicate that this work can be reused.
+        } else {
+            // If an update was already in progress, we should schedule an Update
+            // effect even though we're bailing out, so that cWU/cDU are called.
+            if (typeof instance.componentDidUpdate === 'function') {
+                if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+                    workInProgress.effectTag |= Update;
+                }
+            }
+
+            if (typeof instance.getSnapshotBeforeUpdate === 'function') {
+                if (oldProps !== current.memoizedProps || oldState !== current.memoizedState) {
+                    workInProgress.effectTag |= Snapshot;
+                }
+            } // If shouldComponentUpdate returned false, we should still update the
+            // memoized props/state to indicate that this work can be reused.
 
 
-        workInProgress.memoizedProps = newProps;
-        workInProgress.memoizedState = newState;
-    } // Update the existing instance's state, props, and context pointers even
-    // if shouldComponentUpdate returns false.
+            workInProgress.memoizedProps = newProps;
+            workInProgress.memoizedState = newState;
+        } // Update the existing instance's state, props, and context pointers even
+        // if shouldComponentUpdate returns false.
 
 
-    instance.props = newProps;
-    instance.state = newState;
-    instance.context = nextContext;
-    return shouldUpdate;
-}
-
-//↓↓↓↓↓↓--------render主流程--me---------↓↓↓↓↓↓
-
-function domListen(dom,event,callBack){
-    dom.addEventListener(event,callBack)
-    
-}
-
-/* var config = { DOMNodeRemoved: true };
-
-
-var observer = new MutationObserver(function (mutationsList, observer) {
-    for (var mutation of mutationsList) {
-        if (mutation.type == 'childList') {
-            console.log('子元素被修改');
-        }
-        else if (mutation.type == 'attributes') {
-            console.log(mutation.attributeName + '属性被修改');
-        }
+        instance.props = newProps;
+        instance.state = newState;
+        instance.context = nextContext;
+        return shouldUpdate;
     }
-});
+}
+//↑↑↑↑↑↑--------setState和forceUpdate---------↑↑↑↑↑↑
 
+function runTask_panfeng(fn) {
+    setTimeout(() => {
+        fn()
+    }, 0);
 
-//开始观测
-observer.observe(box, config); */
-//↑↑↑↑↑↑--------render主流程--me---------↑↑↑↑↑↑
+    return "任务获取到了"
+}

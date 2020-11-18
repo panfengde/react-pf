@@ -73,10 +73,10 @@ Component.prototype.isReactComponent = {};
 // 所以 updater 还是个蛮重要的东西
 
 Component.prototype.setState = function (partialState, callback) {
-    //this.updater.enqueueSetState(this, partialState, callback, 'setState');
+    this.updater.enqueueSetState(this, partialState, callback, 'setState');
 };
 
 // 这个 API 用的很好，不清楚作用的看文档吧
 Component.prototype.forceUpdate = function (callback) {
-    //this.updater.enqueueForceUpdate(this, callback, 'forceUpdate');
+    this.updater.enqueueForceUpdate(this, callback, 'forceUpdate');
 };
