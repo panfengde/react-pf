@@ -15,10 +15,8 @@
     <script src="./babel.min.js"></script>
     <script src='./react.js'></script>
     <script src='./react-dom.js'></script>
-
     <!-- <script src='./App.js'></script> -->
     <!-- <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script> -->
-
     <script type="text/babel">
         class BB extends React.Component {
 
@@ -71,15 +69,35 @@
             }
 
             selectAction() {
-                this.setState({
-                    go: "改变1",
-                })
-                this.setState({
-                    go: "改变2",
-                })
-                this.setState({
-                    go: "改变3",
-                })
+                setTimeout(() => {
+                    this.setState({
+                        go: "改变1",
+                    })
+                    alert(1)
+                }, 0)
+
+                setTimeout(() => {
+                    this.setState({
+                        go: "改变2",
+                    })
+                    alert(2)
+                }, 0)
+
+                setTimeout(() => {
+                    this.setState({
+                        go: "改变3",
+                    })
+                    alert(3)
+                }, 0)
+                /*  this.setState({
+                     go: "改变1",
+                 })
+                 this.setState({
+                     go: "改变2",
+                 })
+                 this.setState({
+                     go: "改变3",
+                 }) */
             }
 
             clickDom() {
@@ -111,19 +129,70 @@
                     </div>
                 )
             }
-
         }
 
         console.log(React.createElement("span", {}, "hello react"))
 
-        ReactDOM.render(
-            <App />,
-            document.getElementById('root')
-        );
+        /*  ReactDOM.render(
+             <App />,
+             document.getElementById('root')
+         ); */
 
         console.log(document.getElementById('root')._reactRootContainer)
 
 
+        class NewApp extends React.Component {
+            constructor(props) {
+                super(props)
+                this.state = {
+                    title: "NewApp"
+                }
+            }
+            getDerivedStateFromProps() {
+                console.log("getDerivedStateFromProps")
+            }
+
+            shouldComponentUpdate() {
+                console.log("shouldComponentUpdate")
+                return true
+            }
+            clickButton() {
+                this.setState({
+                    title: "NewApp-change"
+                })
+            }
+            render() {
+                console.log("render")
+                return (<div>
+                    <p>{this.state.title}</p>
+                    <p>xxxxiiiixxxxx</p>
+                    <button onClick={this.clickButton.bind(this)}>go</button>
+                </div>)
+            }
+
+            getSnapshotBeforeUpdate(...a) {
+                console.log("getSnapshotBeforeUpdate")
+                console.log(a)
+                return a
+            }
+            componentDidMount() {
+                console.log("componentDidMount")
+                this.setState({
+                    title: "NewApp-didMount"
+                })
+
+            }
+            componentDidUpdate() {
+                
+                console.log("componentDidUpdate")
+
+            }
+        }
+
+        ReactDOM.render(
+            <NewApp />,
+            document.getElementById('root')
+        );
 
 
     </script>

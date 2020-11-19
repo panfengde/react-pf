@@ -7,11 +7,10 @@ const ReactDOM = {}
 var workInProgress = null; //工作单元代理变量
 var nextEffect = null;
 var REACT_ELEMENT_TYPE = Symbol.for('react.element')
-
 var emptyContextObject = {};
 
 var ImmediatePriority = 99;
-var renderOk = false; 
+var renderOk = false;
 //我自己定义的变量
 
 
@@ -1129,11 +1128,11 @@ var renderOk = false;
         function commitBeforeMutationLifeCycles(current, finishedWork) {
             switch (finishedWork.tag) {
                 case FunctionComponent:
-                case ForwardRef:
-                case SimpleMemoComponent:
-                case Block: {
-                    return;
-                }
+                    /*  case ForwardRef:
+                     case SimpleMemoComponent:
+                     case Block: {
+                         return;
+                     } */
                 case ClassComponent: {
                     if (finishedWork.effectTag & Snapshot) {
                         if (current !== null) {
@@ -1160,10 +1159,10 @@ var renderOk = false;
                 case HostRoot:
                 case HostComponent:
                 case HostText:
-                case HostPortal:
-                case IncompleteClassComponent:
-                    // Nothing to do for these component types
-                    return;
+                    /* case HostPortal:
+                    case IncompleteClassComponent:
+                        // Nothing to do for these component types
+                        return; */
             }
         }
     }
@@ -3509,13 +3508,6 @@ var renderOk = false;
 //↑↑↑↑↑↑--------render主流程---------↑↑↑↑↑↑
 
 
-
-
-
-
-
-
-
 //↓↓↓↓↓↓--------dom事件--me---------↓↓↓↓↓↓
 {
     function domListen(dom, event, callBack) {
@@ -3780,10 +3772,11 @@ var renderOk = false;
 
         if (typeof instance.shouldComponentUpdate === 'function') {
             {
-                if (workInProgress.mode & StrictMode) {
+                /* if (workInProgress.mode & StrictMode) {
                     // Invoke the function an extra time to help detect side-effects.
                     instance.shouldComponentUpdate(newProps, newState, nextContext);
-                }
+                } */
+                instance.shouldComponentUpdate(newProps, newState, nextContext);
             }
 
             var shouldUpdate = instance.shouldComponentUpdate(newProps, newState, nextContext);
