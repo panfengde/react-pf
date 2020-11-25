@@ -10,6 +10,19 @@ var REACT_ELEMENT_TYPE = Symbol.for('react.element')
 var emptyContextObject = {};
 
 var ImmediatePriority = 99;
+
+
+
+
+var DANGEROUSLY_SET_INNER_HTML = 'dangerouslySetInnerHTML';
+var SUPPRESS_CONTENT_EDITABLE_WARNING = 'suppressContentEditableWarning';
+var SUPPRESS_HYDRATION_WARNING = 'suppressHydrationWarning';
+var AUTOFOCUS = 'autoFocus';
+var CHILDREN = 'children';
+var STYLE = 'style';
+var HTML$1 = '__html';
+
+
 var renderOk = false;
 //我自己定义的变量
 
@@ -937,8 +950,6 @@ var renderOk = false;
 //↑↑↑↑↑↑--------关于DOM的操作---------↑↑↑↑↑↑
 
 
-
-
 //↓↓↓↓↓↓--------finishSyncRender---------↓↓↓↓↓↓
 {
     //render分析完成，生成fiber树，开始渲染工作。
@@ -996,8 +1007,9 @@ var renderOk = false;
         //获取 effect 链
         //根据effect链，来渲染dom的变化情况
         console.log(finishedWork)
-        var firstEffect;
 
+        var firstEffect;
+        debugger
         //如果RootFiber 的 effectTag 有值的话，也就是说RootFiber也要commit的话
         //将它的 finishedWork 也插入到 effect 链上，放到effect 链的最后 lastEffect.nextEffect 上
 
@@ -1026,10 +1038,8 @@ var renderOk = false;
         //对应commitBeforeMutationEffects，commitMutationEffects，commitLayoutEffects
 
         if (firstEffect !== null) {
-
             //标记开始进行「before mutation」子阶段了
             //更新当前选中的DOM节点，一般为 document.activeElement || document.body
-
             nextEffect = firstEffect;
             //
             do {
@@ -1064,8 +1074,10 @@ var renderOk = false;
             // the mutation phase, so that the previous tree is still current during
             // componentWillUnmount, but before the layout phase, so that the finished
             // work is current during componentDidMount/Update.
+            debugger
 
             root.current = finishedWork; // The next phase is the layout phase, where we call effects that read
+            debugger
             // the host tree after it's been mutated. The idiomatic use case for this is
             // layout, but class component lifecycles also fire here for legacy reasons.
             nextEffect = firstEffect;
@@ -1179,6 +1191,8 @@ var renderOk = false;
             //对于第一次的render,effect链条上面将只有一个effect,将整个dom填充进入dom中
             //（不应该跟踪副作用 ，shouldTrackSideEffects都为false,）
             //只有fiber树的根结点会记录effect
+
+            debugger
             while (nextEffect !== null) {
 
                 var effectTag = nextEffect.effectTag;
@@ -1987,6 +2001,314 @@ var renderOk = false;
 //↑↑↑↑↑↑--------finishSyncRender---------↑↑↑↑↑↑
 
 
+//↓↓↓↓↓↓--------diff-dom---------↓↓↓↓↓↓
+{
+    function getHostProps(element, props) {
+        var node = element;
+        var checked = props.checked;
+
+        var hostProps = _assign({}, props, {
+            defaultChecked: undefined,
+            defaultValue: undefined,
+            value: undefined,
+            checked: checked != null ? checked : node._wrapperState.initialChecked
+        });
+
+        return hostProps;
+    }
+
+    function flattenChildren(children) {
+        var content = ''; // Flatten children. We'll warn if they are invalid
+        // during validateProps() which runs for hydration too.
+        // Note that this would throw on non-element objects.
+        // Elements are stringified (which is normally irrelevant
+        // but matters for <fbt>).
+
+        React.Children.forEach(children, function (child) {
+            if (child == null) {
+                return;
+            }
+
+            content += child; // Note: we don't warn about invalid children here.
+            // Instead, this is done separately below so that
+            // it happens during the hydration codepath too.
+        });
+        return content;
+    }
+
+    function getHostProps$1(element, props) {
+        var hostProps = _assign({
+            children: undefined
+        }, props);
+
+        var content = flattenChildren(props.children);
+
+        if (content) {
+            hostProps.children = content;
+        }
+
+        return hostProps;
+    }
+
+    function getHostProps$2(element, props) {
+        return _assign({}, props, {
+            value: undefined
+        });
+    }
+
+    function getHostProps$3(element, props) {
+        var node = element;
+
+        if (!(props.dangerouslySetInnerHTML == null)) {
+            {
+                throw Error("`dangerouslySetInnerHTML` does not make sense on <textarea>.");
+            }
+        } // Always set children to the same thing. In IE9, the selection range will
+        // get reset if `textContent` is mutated.  We could add a check in setTextContent
+        // to only set the value if/when the value differs from the node value (which would
+        // completely solve this IE9 bug), but Sebastian+Sophie seemed to like this
+        // solution. The value can be a boolean or object so that's why it's forced
+        // to be a string.
+
+
+        var hostProps = _assign({}, props, {
+            value: undefined,
+            defaultValue: undefined,
+            children: toString(node._wrapperState.initialValue)
+        });
+
+        return hostProps;
+    }
+
+    function assertValidProps(tag, props) {
+        if (!props) {
+            return;
+        } // Note the use of `==` which checks for null or undefined.
+    }
+
+    function diffProperties(domElement, tag, lastRawProps, nextRawProps, rootContainerElement) {
+        /* 1、根据不同标签节点提取新老 props 准备比较
+        2、第一次遍历老 props 把要删除的属性都设置为 null
+        3、第二次遍历新 props , 把新的props push 到updatePayload
+        4、最后生成updatePayload: [k1,null,k2,v2,k3,v3] */
+
+        var updatePayload = null;
+        var lastProps;
+        var nextProps;
+
+        switch (tag) {
+            case 'input':
+                lastProps = getHostProps(domElement, lastRawProps);
+                nextProps = getHostProps(domElement, nextRawProps);
+                updatePayload = [];
+                break;
+
+            case 'option':
+                lastProps = getHostProps$1(domElement, lastRawProps);
+                nextProps = getHostProps$1(domElement, nextRawProps);
+                updatePayload = [];
+                break;
+
+            case 'select':
+                lastProps = getHostProps$2(domElement, lastRawProps);
+                nextProps = getHostProps$2(domElement, nextRawProps);
+                updatePayload = [];
+                break;
+
+            case 'textarea':
+                lastProps = getHostProps$3(domElement, lastRawProps);
+                nextProps = getHostProps$3(domElement, nextRawProps);
+                updatePayload = [];
+                break;
+
+            default:
+                lastProps = lastRawProps;
+                nextProps = nextRawProps;
+
+                /*  if (typeof lastProps.onClick !== 'function' && typeof nextProps.onClick === 'function') {
+                     // TODO: This cast may not be sound for SVG, MathML or custom elements.
+                     trapClickOnNonInteractiveElement(domElement);
+                 } */
+
+                break;
+        }
+
+        //assertValidProps(tag, nextProps);
+        var propKey;
+        var styleName;
+        var styleUpdates = null;
+
+        for (propKey in lastProps) {
+            if (nextProps.hasOwnProperty(propKey) || !lastProps.hasOwnProperty(propKey) || lastProps[propKey] == null) {
+                continue;
+            }
+
+            if (propKey === STYLE) {
+                var lastStyle = lastProps[propKey];
+
+                for (styleName in lastStyle) {
+                    if (lastStyle.hasOwnProperty(styleName)) {
+                        if (!styleUpdates) {
+                            styleUpdates = {};
+                        }
+
+                        styleUpdates[styleName] = '';
+                    }
+                }
+            } else if (propKey === DANGEROUSLY_SET_INNER_HTML || propKey === CHILDREN);
+            else if (propKey === SUPPRESS_CONTENT_EDITABLE_WARNING || propKey === SUPPRESS_HYDRATION_WARNING);
+            else if (propKey === AUTOFOCUS);
+            /* else if (registrationNameModules.hasOwnProperty(propKey)) {
+                // This is a special case. If any listener updates we need to ensure
+                // that the "current" fiber pointer gets updated so we need a commit
+                // to update this element.
+                if (!updatePayload) {
+                    updatePayload = [];
+                }
+            } */
+            else {
+                // For all other deleted properties we add it to the queue. We use
+                // the whitelist in the commit phase instead.
+                (updatePayload = updatePayload || []).push(propKey, null);
+            }
+        }
+
+        for (propKey in nextProps) {
+            var nextProp = nextProps[propKey];
+            var lastProp = lastProps != null ? lastProps[propKey] : undefined;
+
+            if (!nextProps.hasOwnProperty(propKey) || nextProp === lastProp || nextProp == null && lastProp == null) {
+                continue;
+            }
+
+            if (propKey === STYLE) {
+                {
+                    if (nextProp) {
+                        // Freeze the next style object so that we can assume it won't be
+                        // mutated. We have already warned for this in the past.
+                        Object.freeze(nextProp);
+                    }
+                }
+
+                if (lastProp) {
+                    // Unset styles on `lastProp` but not on `nextProp`.
+                    for (styleName in lastProp) {
+                        if (lastProp.hasOwnProperty(styleName) && (!nextProp || !nextProp.hasOwnProperty(styleName))) {
+                            if (!styleUpdates) {
+                                styleUpdates = {};
+                            }
+
+                            styleUpdates[styleName] = '';
+                        }
+                    } // Update styles that changed since `lastProp`.
+
+
+                    for (styleName in nextProp) {
+                        if (nextProp.hasOwnProperty(styleName) && lastProp[styleName] !== nextProp[styleName]) {
+                            if (!styleUpdates) {
+                                styleUpdates = {};
+                            }
+
+                            styleUpdates[styleName] = nextProp[styleName];
+                        }
+                    }
+                } else {
+                    // Relies on `updateStylesByID` not mutating `styleUpdates`.
+                    if (!styleUpdates) {
+                        if (!updatePayload) {
+                            updatePayload = [];
+                        }
+
+                        updatePayload.push(propKey, styleUpdates);
+                    }
+
+                    styleUpdates = nextProp;
+                }
+            } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
+                var nextHtml = nextProp ? nextProp[HTML$1] : undefined;
+                var lastHtml = lastProp ? lastProp[HTML$1] : undefined;
+
+                if (nextHtml != null) {
+                    if (lastHtml !== nextHtml) {
+                        (updatePayload = updatePayload || []).push(propKey, nextHtml);
+                    }
+                }
+            } else if (propKey === CHILDREN) {
+                if (lastProp !== nextProp && (typeof nextProp === 'string' || typeof nextProp === 'number')) {
+                    (updatePayload = updatePayload || []).push(propKey, '' + nextProp);
+                }
+            } else if (propKey === SUPPRESS_CONTENT_EDITABLE_WARNING || propKey === SUPPRESS_HYDRATION_WARNING);
+            /* else if (registrationNameModules.hasOwnProperty(propKey)) {
+                if (nextProp != null) {
+                    // We eagerly listen to this even though we haven't committed yet.
+                    if (typeof nextProp !== 'function') {
+                        warnForInvalidEventListener(propKey, nextProp);
+                    }
+
+                    ensureListeningTo(rootContainerElement, propKey);
+                }
+
+                if (!updatePayload && lastProp !== nextProp) {
+                    // This is a special case. If any listener updates we need to ensure
+                    // that the "current" props pointer gets updated so we need a commit
+                    // to update this element.
+                    updatePayload = [];
+                }
+            } */
+            else {
+                // For any other property we always add it to the queue and then we
+                // filter it out using the whitelist during the commit.
+                (updatePayload = updatePayload || []).push(propKey, nextProp);
+            }
+        }
+
+        if (styleUpdates) {
+
+            (updatePayload = updatePayload || []).push(STYLE, styleUpdates);
+        }
+
+        return updatePayload;
+    } // Apply the diff.
+
+    function prepareUpdate(domElement, type, oldProps, newProps, rootContainerInstance, hostContext) {
+
+        return diffProperties(domElement, type, oldProps, newProps, rootContainerInstance);
+    }
+
+    updateHostComponent$1 = function (current, workInProgress, type, newProps, rootContainerInstance) {
+        // If we have an alternate, that means this is an update and we need to
+        // schedule a side-effect to do the updates.
+        var oldProps = current.memoizedProps;
+
+        if (oldProps === newProps) {
+            // In mutation mode, this is sufficient for a bailout because
+            // we won't touch this node even if children changed.
+            return;
+        } // If we get updated because one of our children updated, we don't
+        // have newProps so we'll have to reuse them.
+        // TODO: Split the update API as separate for the props vs. children.
+        // Even better would be if children weren't special cased at all tho.
+
+
+        var instance = workInProgress.stateNode;
+        //var currentHostContext = getHostContext(); // TODO: Experiencing an error where oldProps is null. Suggests a host
+        // component is hitting the resume path. Figure out why. Possibly
+        // related to `hidden`.
+
+        var updatePayload = prepareUpdate(instance, type, oldProps, newProps, rootContainerInstance, currentHostContext = null); // TODO: Type this specific to this type of component.
+
+        workInProgress.updateQueue = updatePayload; // If the update payload indicates that there is a change or if there
+        // is a new ref we mark this as an update. All the work is done in commitWork.
+
+        if (updatePayload) {
+            markUpdate(workInProgress);
+        }
+    };
+}
+//↑↑↑↑↑↑--------diff-dom---------↑↑↑↑↑↑
+
+
+
 //↓↓↓↓↓↓--------completeUnitOfWork---------↓↓↓↓↓↓
 {
 
@@ -2180,7 +2502,7 @@ var renderOk = false;
                 //var rootContainerInstance = getRootHostContainer();
 
                 if (current !== null && workInProgress.stateNode != null) {
-                    //updateHostComponent$1(current, workInProgress, type, newProps, rootContainerInstance);
+                    updateHostComponent$1(current, workInProgress, type, newProps, rootContainerInstance);
                 } else {
                     var rootContainerInstance = document;
                     var type = workInProgress.type;
@@ -2316,7 +2638,7 @@ var renderOk = false;
             }
             var nextProp = nextProps[propKey];
 
-            if (propKey === "style") {
+            if (propKey === STYLE) {
                 {
                     if (nextProp) {
                         // Freeze the next style object so that we can assume it won't be
@@ -2333,7 +2655,7 @@ var renderOk = false;
                     //setInnerHTML(domElement, nextHtml);
                     domElement.innerHTML = nextHtml;
                 }
-            } else if (propKey === 'children') {
+            } else if (propKey === CHILDREN) {
                 if (typeof nextProp === 'string') {
                     // Avoid setting initial textContent when the text is empty. In IE11 setting
                     // textContent on a <textarea> will cause the placeholder to not
@@ -2391,7 +2713,6 @@ var renderOk = false;
         //（fiber树的第一个节点--fiberHost节点，指定了alternate,在 legacyCreateRootFromDOMContainer函数中 uninitializedFiber.stateNode = root;这里的root就是fiber树的坑位）
         //因为第一次render时，还没用渲染过，所以在当前这个时间点之前，alternate一定时null
         //current就是fiber.alternate
-
         if (current === null) {
             //不应该跟踪副作用 ，shouldTrackSideEffects都为false，
             workInProgress.child = mountChildFibers(workInProgress, null, nextChildren, renderExpirationTime);
@@ -2513,8 +2834,46 @@ var renderOk = false;
          */
         function reconcileSingleElement(returnFiber, currentFirstChild, element, expirationTime) {
             var key = element.key;
+            debugger
             var child = currentFirstChild;
             //根据这个单个子元素的情况，生成一个fiber
+            while (child !== null) {
+
+                // TODO: If key === null and child.key === null, then this only applies to
+                // the first item in the list.
+                if (child.key === key) {
+                    switch (child.tag) {
+                        /*   
+                     case Fragment: {
+                     case Block:
+                   */
+                        default: {
+                            if (child.elementType === element.type) {
+                                deleteRemainingChildren(returnFiber, child.sibling);
+
+                                var _existing3 = useFiber(child, element.props);
+
+                                //_existing3.ref = coerceRef(returnFiber, child, element);
+                                _existing3.return = returnFiber;
+                                return _existing3;
+                            }
+
+                            break;
+                        }
+                    } // Didn't match.
+                    deleteRemainingChildren(returnFiber, child);
+                    break;
+                } else {
+                    deleteChild(returnFiber, child);
+                }
+
+                child = child.sibling;
+            }
+
+
+
+
+
             var _created4 = createFiberFromElement(element, returnFiber.mode, expirationTime);
             _created4.return = returnFiber;
             return _created4;
@@ -2544,15 +2903,21 @@ var renderOk = false;
 
         function updateElement(returnFiber, current, element, expirationTime) {
             if (current !== null) {
-                if (current.elementType === element.type || ( // Keep this check inline so it only runs on the false path:
+                /* if (current.elementType === element.type || ( 
                         isCompatibleFamilyForHotReloading(current, element))) {
-                    // Move based on index
                     var existing = useFiber(current, element.props);
-                    //existing.ref = coerceRef(returnFiber, current, element);
+                    existing.return = returnFiber;
+                    return existing;
+                } */
+                //改造
+
+                if (current.elementType === element.elementType) {
+
+                    var existing = useFiber(current, element.props);
                     existing.return = returnFiber;
                     return existing;
                 }
-            } // Insert
+            }
 
 
             var created = createFiberFromElement(element, returnFiber.mode, expirationTime);
@@ -2728,6 +3093,26 @@ var renderOk = false;
             return null;
         }
 
+        function mapRemainingChildren(returnFiber, currentFirstChild) {
+            // Add the remaining children to a temporary map so that we can find them by
+            // keys quickly. Implicit (null) keys get added to this set with their index
+            // instead.
+            var existingChildren = new Map();
+            var existingChild = currentFirstChild;
+    
+            while (existingChild !== null) {
+              if (existingChild.key !== null) {
+                existingChildren.set(existingChild.key, existingChild);
+              } else {
+                existingChildren.set(existingChild.index, existingChild);
+              }
+    
+              existingChild = existingChild.sibling;
+            }
+    
+            return existingChildren;
+          }
+
         function reconcileChildrenArray(returnFiber, currentFirstChild, newChildren, expirationTime) {
 
             var resultingFirstChild = null;
@@ -2856,6 +3241,7 @@ var renderOk = false;
 
         //分析、调和子元素，依据子元素情况生成fiber节点，并返回
         function reconcileChildFibers(returnFiber, currentFirstChild, newChild, expirationTime) {
+            debugger
             //根据子元素的类型，进行对象的处理
             //如：类、数组、文本，改怎么判断和处理
             var isObject = typeof newChild === 'object' && newChild !== null;
@@ -2877,7 +3263,7 @@ var renderOk = false;
             }
 
             if (Array.isArray(newChild)) {
-                console.log(newChild)
+                //console.log(newChild)
                 return reconcileChildrenArray(returnFiber, currentFirstChild, newChild, expirationTime);
             }
 
@@ -2892,19 +3278,7 @@ var renderOk = false;
 
     function forceUnmountCurrentAndReconcile(current, workInProgress, nextChildren, renderExpirationTime) {
 
-        // This function is fork of reconcileChildren. It's used in cases where we
-        // want to reconcile without matching against the existing set. This has the
-        // effect of all current children being unmounted; even if the type and key
-        // are the same, the old child is unmounted and a new child is created.
-        //
-        // To do this, we're going to go through the reconcile algorithm twice. In
-        // the first pass, we schedule a deletion for all the current children by
-        // passing null.
         workInProgress.child = reconcileChildFibers(workInProgress, current.child, null, renderExpirationTime);
-        // In the second pass, we mount the new children. The trick here is that we
-        // pass null in place of where we usually pass the current child set. This has
-        // the effect of remounting all children regardless of whether their
-        // identities match.
 
         workInProgress.child = reconcileChildFibers(workInProgress, null, nextChildren, renderExpirationTime);
     }
@@ -2912,10 +3286,8 @@ var renderOk = false;
 }
 //↑↑↑↑↑↑--------reconcileChildren---------↑↑↑↑↑↑
 
-
 //↓↓↓↓↓↓--------beginWork---------↓↓↓↓↓↓
 {
-
     /**
      * current指fiber树上，当前分析到的fiber节点
      * workInProgress据是根据current创建的工作单元，可以成为一个中间代理单元
@@ -2931,7 +3303,6 @@ var renderOk = false;
      * 
      * 返回根据子元素情况，创建的fiber
      */
-
     function beginWork(current, workInProgress) {
         //这里我随意指定一个时间
         let renderExpirationTime = 0;
@@ -3016,11 +3387,6 @@ var renderOk = false;
                 workInProgress.effectTag |= ContentReset;
             }
 
-            if (prevProps !== null && shouldSetTextContent(type, prevProps)) {
-                //作用？？？
-                workInProgress.effectTag |= ContentReset;
-            }
-
             reconcileChildren(current, workInProgress, nextChildren, renderExpirationTime);
             return workInProgress.child;
         }
@@ -3039,22 +3405,34 @@ var renderOk = false;
          * 
          */
         function updateClassComponent(current, workInProgress, Component, nextProps, renderExpirationTime) {
+            /*这个函数的作用是对未初始化的类组件进行初始化，对已经初始化的组件更新重用。
+
+            1、如果还没创建实例，初始化，说明是第一次渲染（instance === null）
+            调用constructClassInstance，执行构造函数，生成实例instance
+            然后在调用mountClassInstance，挂载实例，主要工作是更新instance.state，并且执行一些生命周期
+            2、渲染被中断 instance !== null, current === null
+            调用resumeMountClassInstance 复用实例但还是调用首次渲染的生命周期，这个函数如果反复false则组件无需更新
+            3、更新渲染 instance !== null, current !== null
+            调用updateClassInstance，调用 didUpdate 和 componentWillReceiveProp 生命周期，这个函数如果反复false则组件无需更新
+            4、最终执行 finishClassComponent, 进行错误判断的处理和判断是否可以跳过更新的过程，重新调和子节点 reconcileChildren */
+
             //省略很多代码
             //构建类实例---返回的实例没使用
             //类实体挂载在了workInProgress的statenode上面
 
             var instance = workInProgress.stateNode;
             var shouldUpdate;
-            debugger
+            //debugger
 
+            //在组件第一次渲染时
             if (instance === null) {
-                //组件第一次渲染时
+
                 if (current !== null) {
                     current.alternate = null;
                     workInProgress.alternate = null;
                     workInProgress.effectTag |= Placement;
                 }
-                //1、创建一个class组件实例（instance），即业务中写好的class component。
+                //1、创建一个class组件实例（instance），即业务中写好的classnent。
                 // 2、将实例赋值给stateNode属性：workInProgress.stateNode = instance
                 //3、将classComponentUpdater挂载到instance.updater 上;（setStae,forceUpDate等都需要这个classComponentUpdater对像）
                 constructClassInstance(workInProgress, Component, nextProps);
@@ -3065,8 +3443,8 @@ var renderOk = false;
                  2、如果这个update需要更新，调用getStateFromUpdate获取到新的state。
                  3、更新成最新的state：instance.state = workInProgress.memoizedState;
                  4、调用React新的生命周期函数：getDerivedStateFromProps并且执行，这个生命周期可能改变State，所以再次需要instance.state = workInProgress.memoizedState
-                 5、如果没有使用getDerivedStateFromProps而使用componentWillMount，这里为了兼容旧版。执行componentWillMount，这个生命周期可能改变State。
-                 6、最后标记 componentDidMount 生命周期，待到提交阶段更新完 dom 后执行 
+                 5、如果没有使用getDerivedStateFromProps而使nentWillMount，这里为了兼容旧版。执nentWillMount，这个生命周期可能改变State。
+                 6、最后标记nentDidMount 生命周期，待到提交阶段更新完 dom 后执行 
                  */
                 mountClassInstance(workInProgress, Component, nextProps, renderExpirationTime);
             } else if (current === null) {
@@ -3190,13 +3568,14 @@ var renderOk = false;
 
             workInProgress.effectTag |= PerformedWork;
 
-
-            if (current !== null) {
+            let didCaptureError = false
+            if (current !== null && didCaptureError) {
+                //再我这，是不会走这里的
                 forceUnmountCurrentAndReconcile(current, workInProgress, nextChildren, renderExpirationTime);
             } else {
                 reconcileChildren(current, workInProgress, nextChildren, renderExpirationTime);
             }
-
+            debugger
             workInProgress.memoizedState = instance.state;
             return workInProgress.child;
             //注意返回的是child
@@ -3348,7 +3727,7 @@ var renderOk = false;
     function performSyncWorkOnRoot(root) {
         //root指的是fiberRoot，fiber数据结构的根节点
 
-        debugger
+        //debugger
         var expirationTime = Sync;
 
         //给全局的workInProgress变量赋值
@@ -3533,12 +3912,10 @@ var renderOk = false;
     //开始观测
     observer.observe(box, config); */
 }
-//↑↑↑↑↑↑--------render主流程--me---------↑↑↑↑↑↑
-
+//↑↑↑↑↑↑--------dom事件--me---------↑↑↑↑↑↑
 
 
 //↓↓↓↓↓↓--------setState和forceUpdate---------↓↓↓↓↓↓
-
 {
 
     function isMounted(component) {
@@ -3570,7 +3947,7 @@ var renderOk = false;
     var classComponentUpdater = {
         isMounted: isMounted,
         enqueueSetState: function (inst, payload, callback) {
-            debugger
+            //debugger
             //
             var fiber = get(inst);
 
@@ -3691,7 +4068,7 @@ var renderOk = false;
             alternate.expirationTime = expirationTime;
         } // Walk the parent path to the root and update the child expiration time.
 
-        //向上遍历父节点，直到root节点，在遍历的过程中更新子节点的expirationTime
+        //向上遍历父节点，直到root节点，在遍历的过程中更新子/节点的expirationTime
         var node = fiber.return;
         var root = null;
 
@@ -3832,6 +4209,7 @@ var renderOk = false;
         var newState = instance.state = oldState;
         processUpdateQueue(workInProgress, newProps, instance, renderExpirationTime);
         newState = workInProgress.memoizedState;
+        debugger
 
         if (oldProps === newProps && oldState === newState) {
             // If an update was already in progress, we should schedule an Update

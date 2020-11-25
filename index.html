@@ -10,6 +10,13 @@
     <p>111</p>
 </div>
 <!-- https://projects.wojtekmaj.pl/react-lifecycle-methods-diagram/ -->
+<style>
+    div {
+        padding: 5px;
+        margin: 2px;
+        border: 1px solid orange;
+    }
+</style>
 
 <body>
     <script src="./babel.min.js"></script>
@@ -130,17 +137,13 @@
                 )
             }
         }
-
         console.log(React.createElement("span", {}, "hello react"))
 
         /*  ReactDOM.render(
              <App />,
              document.getElementById('root')
          ); */
-
         console.log(document.getElementById('root')._reactRootContainer)
-
-
         class NewApp extends React.Component {
             constructor(props) {
                 super(props)
@@ -166,6 +169,7 @@
                 return (<div>
                     <p>{this.state.title}</p>
                     <p>xxxxiiiixxxxx</p>
+                    <FiberExample />
                     <button onClick={this.clickButton.bind(this)}>go</button>
                 </div>)
             }
@@ -183,20 +187,57 @@
 
             }
             componentDidUpdate() {
-                
+
                 console.log("componentDidUpdate")
 
             }
         }
 
+        class FiberExample extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = {
+                    index1: 1,
+                    index2: 2,
+                    index3: 3,
+                    index4: 4,
+                }
+            }
+
+            go() {
+                this.setState({
+                    index1: 1.1,
+                    index2: 2.1,
+                    index3: 3.1,
+                    index4: 4.1,
+
+                })
+
+                setTimeout(() => {
+                    console.log("setState完毕")
+                    console.log(document.getElementById('root')._reactRootContainer)
+                }, 1000);
+
+            }
+
+            render() {
+                return (
+                    <div index={1111}>
+                        <div index={22222} onClick={this.go.bind(this)} >{this.state.index1}</div>
+                        {this.state.index1 === 1 && <div>gogo</div>}
+                    </div>
+                )
+
+            }
+        }
         ReactDOM.render(
-            <NewApp />,
+            <FiberExample />,
             document.getElementById('root')
         );
 
-
+        console.log("render完毕")
+        console.log(document.getElementById('root')._reactRootContainer)
     </script>
-
 </body>
 
 </html>
